@@ -1,0 +1,33 @@
+{
+    "autoeval_version": "0.1.1",
+    "distro": {
+        "machine": "x86_64",
+        "release": "6.2.0-32-generic",
+        "system": "Linux",
+        "version": "22.04.3",
+        "name": "Ubuntu"
+    },
+    "virtualized": false,
+    "dockerized": false,
+    "self-os-declaration": true,
+    "generate": true,
+    "python": {
+        "version": "3.10.12"
+    },
+    "ros": {
+        "version": "humble"
+    },
+    "gazebo": {
+        "version": "11.10.2",
+        "RTF": 1.0,
+        "joint_states": [
+            "FWL",
+            "RWR",
+            "FWR",
+            "RWL"
+        ]
+    },
+    "meta": {
+        "evaluation_time": 1.8781492710113525
+    }
+}
