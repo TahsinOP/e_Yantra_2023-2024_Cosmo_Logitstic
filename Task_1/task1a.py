@@ -196,11 +196,13 @@ def detect_aruco(image):
             center_aruco_list.append((center_x, center_y))
 
             # Perform pose estimation of the marker to get distance and angle
-            rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size_of_aruco_m, cam_mat, dist_mat)
-            distance_from_rgb = np.linalg.norm(tvec)
-            print(tvec.shape)
+            rvec,tvec,_ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size_of_aruco_m, cam_mat, dist_mat)
+            
+            print(tvec)
             tvec = tvec.squeeze(1)
-            angle_aruco = np.degrees(np.arctan2(tvec[0, 0], tvec[0, 2]))
+            
+            distance_from_rgb = tvec[0,2]-0.01
+            angle_aruco =  (np.arctan2(tvec[0, 0], tvec[0, 2]))
             
             # Append the detected marker information to respective lists
             distance_from_rgb_list.append(distance_from_rgb)
@@ -384,8 +386,8 @@ class aruco_tf(Node):
 
         ############################################
         center_aruco_list, distance_from_rgb_list, angle_aruco_list, width_aruco_list, ids = detect_aruco(self.cv_image)
-        print(self.cv_image)
-        print(self.depth_image)
+        #print(self.cv_image)
+        #print(self.depth_image)
        
         
 
@@ -395,7 +397,7 @@ class aruco_tf(Node):
             marker_id = ids[i]
             distance_from_rgb = distance_from_rgb_list[i]
             angle_aruco = angle_aruco_list[i]
-            print(center_aruco_list[i])
+            
 
             # Correct the Aruco angle using the correction formula
             angle_aruco = (0.788 * angle_aruco) - ((angle_aruco ** 2) / 3160)
@@ -408,13 +410,36 @@ class aruco_tf(Node):
 
             # Retrieve depth from Realsense and convert to meters
 
-            #depth_meters = (center_aruco_list[i][2] )/ 1000.0
+            #distance_from_rgb = distance_from_rgb/1000
+
+            
 
             # Calculate X, Y, Z based on camera parameters and Aruco properties
             cX, cY = center_aruco_list[i][:2]
+            #depth = math.sqrt(pow(cX,2)+pow(cY,2))
             x = distance_from_rgb * (sizeCamX - cX - centerCamX) / focalX
             y = distance_from_rgb * (sizeCamY - cY - centerCamY) / focalY
             z = distance_from_rgb
+            angle_y_rad = 1.57
+            angle_x_rad = 1.57
+
+            rotation_matrix_x = np.array([[1, 0, 0],
+                              [0, np.cos(angle_x_rad), -np.sin(angle_x_rad)],
+                              [0, np.sin(angle_x_rad), np.cos(angle_x_rad)]])
+
+            rotation_matrix_y = np.array([[np.cos(angle_y_rad), 0, np.sin(angle_y_rad)],
+                              [0, 1, 0],
+                              [-np.sin(angle_y_rad), 0, np.cos(angle_y_rad)]])
+            
+            # rotation_matrix_z = np.array([[np.cos(angle_z_rad), -np.sin(angle_z_rad), 0],
+            #                   [np.sin(angle_z_rad), np.cos(angle_z_rad), 0],
+            #                   [0, 0, 1]])
+            
+
+            
+            original_vector = np.array([[x], [y], [z]])
+            rotated_vector = np.dot(rotation_matrix_x,(np.dot(rotation_matrix_y, original_vector)))
+            print(x,y,z)
 
             # Mark the center points on the image frame
             cv2.circle(self.cv_image, (int(cX), int(cY)), 5, (0, 0, 255), -1)
@@ -424,14 +449,15 @@ class aruco_tf(Node):
             transform_stamped.header.stamp = self.get_clock().now().to_msg()
             transform_stamped.header.frame_id = 'camera_link'
             transform_stamped.child_frame_id = 'cam_{}'.format(marker_id)
-            transform_stamped.transform.translation.x = x
-            transform_stamped.transform.translation.y = y
-            transform_stamped.transform.translation.z = z
-            transform_stamped.transform.rotation.x = quaternion[0]
-            transform_stamped.transform.rotation.y = quaternion[1]
-            transform_stamped.transform.rotation.z = quaternion[2]
-            transform_stamped.transform.rotation.w = quaternion[3]
+            transform_stamped.transform.translation.x = float(rotated_vector[0])
+            transform_stamped.transform.translation.y = float(rotated_vector[1])
+            transform_stamped.transform.translation.z = float(rotated_vector[2])
+            transform_stamped.transform.rotation.x = quaternion[1]
+            transform_stamped.transform.rotation.y = quaternion[2]
+            transform_stamped.transform.rotation.z = quaternion[3]
+            transform_stamped.transform.rotation.w = quaternion[0]
             self.br.sendTransform(transform_stamped)
+            print(distance_from_rgb)
 
             try:
                 base_to_camera = self.tf_buffer.lookup_transform('base_link', 'cam_{}'.format(marker_id), rclpy.time.Time())
