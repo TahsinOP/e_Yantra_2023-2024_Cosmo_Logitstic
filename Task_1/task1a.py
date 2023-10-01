@@ -43,7 +43,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import TransformStamped
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import CompressedImage, Image
-import tf2_py
+
 
 
 
@@ -166,6 +166,8 @@ def detect_aruco(image):
     angle_aruco_list = []
     width_aruco_list = []
     ids = []
+    rvec_list = []
+    tvec_list = []
 
     # Convert input BGR image to GRAYSCALE for Aruco detection
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -197,12 +199,14 @@ def detect_aruco(image):
 
             # Perform pose estimation of the marker to get distance and angle
             rvec,tvec,_ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size_of_aruco_m, cam_mat, dist_mat)
+            rvec_list.append(rvec)
+            tvec_list.append(tvec)
             
-            print(tvec)
+            print(i,rvec,tvec)
             tvec = tvec.squeeze(1)
             
-            distance_from_rgb = tvec[0,2]-0.01
-            angle_aruco =  (np.arctan2(tvec[0, 0], tvec[0, 2]))
+            distance_from_rgb = tvec[0,2]#-0.02
+            angle_aruco = (np.arctan2(tvec[0, 0], tvec[0, 2]))
             
             # Append the detected marker information to respective lists
             distance_from_rgb_list.append(distance_from_rgb)
@@ -216,7 +220,7 @@ def detect_aruco(image):
             # Draw frame axes
             cv2.drawFrameAxes(image, cam_mat, dist_mat, rvec, tvec, size_of_aruco_m)
 
-    return center_aruco_list, distance_from_rgb_list, angle_aruco_list, width_aruco_list, ids
+    return center_aruco_list, distance_from_rgb_list, angle_aruco_list, width_aruco_list, ids, rvec_list, tvec_list
 
 
 ##################### CLASS DEFINITION #######################
@@ -385,7 +389,7 @@ class aruco_tf(Node):
         #               Also, auto eval script will be judging angular difference aswell. So, make sure that Z axis is inside the box (Refer sample images on Portal - MD book)
 
         ############################################
-        center_aruco_list, distance_from_rgb_list, angle_aruco_list, width_aruco_list, ids = detect_aruco(self.cv_image)
+        center_aruco_list, distance_from_rgb_list, angle_aruco_list, width_aruco_list, ids, rvec_list, tvec_list = detect_aruco(self.cv_image)
         #print(self.cv_image)
         #print(self.depth_image)
        
@@ -406,7 +410,7 @@ class aruco_tf(Node):
             roll = 0.0
             pitch = 0.0
             yaw = angle_aruco
-            quaternion = self.euler_to_quaternion(roll, pitch, yaw)
+            # quaternion = self.euler_to_quaternion(roll, pitch, yaw)
 
             # Retrieve depth from Realsense and convert to meters
 
@@ -422,6 +426,15 @@ class aruco_tf(Node):
             z = distance_from_rgb
             angle_y_rad = 1.57
             angle_x_rad = 1.57
+            angle_z_rad = math.pi/2
+
+            def get_rot_mat_y(deg):
+                angle_y_rad = deg*math.pi/180
+                rotation_matrix_y = np.array([[np.cos(angle_y_rad), 0, np.sin(angle_y_rad)],
+                              [0, 1, 0],
+                              [-np.sin(angle_y_rad), 0, np.cos(angle_y_rad)]])
+                
+                return rotation_matrix_y
 
             rotation_matrix_x = np.array([[1, 0, 0],
                               [0, np.cos(angle_x_rad), -np.sin(angle_x_rad)],
@@ -431,15 +444,98 @@ class aruco_tf(Node):
                               [0, 1, 0],
                               [-np.sin(angle_y_rad), 0, np.cos(angle_y_rad)]])
             
-            # rotation_matrix_z = np.array([[np.cos(angle_z_rad), -np.sin(angle_z_rad), 0],
-            #                   [np.sin(angle_z_rad), np.cos(angle_z_rad), 0],
-            #                   [0, 0, 1]])
+            rotation_matrix_z = np.array([[np.cos(angle_z_rad), -np.sin(angle_z_rad), 0],
+                              [np.sin(angle_z_rad), np.cos(angle_z_rad), 0],
+                              [0, 0, 1]])
             
+            rvec = rvec_list[i]
+            tvec = tvec_list[i]
 
+            rotation_matrix_from_rvec = R.from_rotvec(rvec.reshape(3,))
+            rotation_matrix_from_rvec = rotation_matrix_from_rvec.as_matrix()
+
+            rotation_matrix_y_180 = np.array([[-1, 0, 0],
+                             [0, 1, 0],
+                             [0, 0, -1]])
+            # print(rotation_matrix_from_rvec)
             
             original_vector = np.array([[x], [y], [z]])
-            rotated_vector = np.dot(rotation_matrix_x,(np.dot(rotation_matrix_y, original_vector)))
-            print(x,y,z)
+            rotated_vector = np.dot(rotation_matrix_x,(np.dot(rotation_matrix_y, original_vector))) #This is for the transform !!!DO NOT CHANGE 
+
+            transform_rotation_matrix_inv = np.dot(rotation_matrix_y,rotation_matrix_x)#np.dot(rotation_matrix_x,rotation_matrix_y)
+            transform_rotation_matrix_inv = np.dot(rotation_matrix_y_180,transform_rotation_matrix_inv)
+
+            rotation_matrix_z_180 = np.array([[-1, 0, 0],
+                             [0, -1, 0],
+                             [0, 0, 1]])
+
+            if i == 2:
+                transform_rotation_matrix_inv = np.dot(rotation_matrix_y, transform_rotation_matrix_inv)
+                transform_rotation_matrix_inv = np.dot(rotation_matrix_x, transform_rotation_matrix_inv)
+                transform_rotation_matrix_inv = np.dot(rotation_matrix_z, transform_rotation_matrix_inv)
+                transform_rotation_matrix_inv = np.dot(get_rot_mat_y(70), transform_rotation_matrix_inv)
+
+            # transform_rotation_matrix_inv = np.dot(rotation_matrix_y,transform_rotation_matrix_inv)
+
+            rotation_matrix_z_180 = np.array([[-1, 0, 0],
+                             [0, -1, 0],
+                             [0, 0, 1]])
+            
+            # transform_rotation_matrix_inv = np.dot(rotation_matrix_z_180,transform_rotation_matrix_inv)
+
+            # roll = math.pi/2
+            # pitch = math.pi/2
+            # yaw += -math.pi/2+0.05
+            '''
+            r2 = np.array([
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0]
+            ])
+
+            r1 = R.from_matrix(rotation_matrix_from_rvec)
+            r1 = r1.as_matrix()
+            print(f"r1 is {r1}")
+            r1_inv = np.linalg.inv(r1)
+
+            print(r2)
+            print(r1_inv)
+
+            print(type(r2),type(r1_inv))
+
+            final_rotation_matrix = np.matmul(r1_inv, r2)
+            final_rotation_matrix = np.linalg.inv(final_rotation_matrix)'''
+            # final_rotation_matrix = final_rotation_matrix.as_matrix()
+
+            try:
+                base_to_camera_link = self.tf_buffer.lookup_transform('base_link', 'camera_link',rclpy.time.Time())
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                continue
+
+            base_to_camera_link_quat = [
+                base_to_camera_link.transform.rotation.x,
+                base_to_camera_link.transform.rotation.y,
+                base_to_camera_link.transform.rotation.z,
+                base_to_camera_link.transform.rotation.w,
+            ]
+
+            rotation_matrix_from_cam_link = R.from_quat(base_to_camera_link_quat).as_matrix()
+            rotation_matrix_from_cam_link = np.linalg.inv(rotation_matrix_from_cam_link)
+            
+            final_rotation_matrix = np.dot(rotation_matrix_from_rvec,rotation_matrix_from_cam_link)
+
+            final_rotation_matrix = np.dot(transform_rotation_matrix_inv, final_rotation_matrix)
+
+            quaternion = self.rotate_quaternion_by_matrix(roll,pitch,yaw,final_rotation_matrix)
+
+            # quaternion = self.rotate_quaternion_by_matrix(roll,pitch,yaw,final_rotation_matrix)
+
+            # req_r_matrix = self.find_rotation_matrix_to_align_with_up([roll,pitch,yaw])
+            # rotated_vector = np.dot(req_r_matrix,rotated_vector)
+
+            # rotated_vector = np.dot(rotation_matrix_from_rvec)
+            #quaternion = self.rotation_vector_to_quaternion(rotated_vector)
+
 
             # Mark the center points on the image frame
             cv2.circle(self.cv_image, (int(cX), int(cY)), 5, (0, 0, 255), -1)
@@ -452,17 +548,31 @@ class aruco_tf(Node):
             transform_stamped.transform.translation.x = float(rotated_vector[0])
             transform_stamped.transform.translation.y = float(rotated_vector[1])
             transform_stamped.transform.translation.z = float(rotated_vector[2])
-            transform_stamped.transform.rotation.x = quaternion[1]
-            transform_stamped.transform.rotation.y = quaternion[2]
-            transform_stamped.transform.rotation.z = quaternion[3]
-            transform_stamped.transform.rotation.w = quaternion[0]
+            transform_stamped.transform.rotation.w = float(quaternion[0])
+            transform_stamped.transform.rotation.x = float(quaternion[1])
+            transform_stamped.transform.rotation.y = float(quaternion[2])
+            transform_stamped.transform.rotation.z = float(quaternion[3])
+            
             self.br.sendTransform(transform_stamped)
-            print(distance_from_rgb)
+            # print(distance_from_rgb)
 
             try:
                 base_to_camera = self.tf_buffer.lookup_transform('base_link', 'cam_{}'.format(marker_id), rclpy.time.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
+
+            
+
+            # print(f"Gay sex{base_to_camera_link.transform.rotation}")
+           
+
+            # print(transform_stamped.transform.rotation)
+            # print(base_to_camera.transform.rotation)
+
+            # final_quaternion = R.from_matrix(np.dot(np.linalg.inv(rotation_matrix_from_cam_link),rotation_matrix_from_rvec)).as_quat()
+            # print("hi",final_quaternion)
+
+
 
             # Publish TF between object frame and base_link
             transform_stamped.header.frame_id = 'base_link'
@@ -470,104 +580,100 @@ class aruco_tf(Node):
             transform_stamped.transform.translation.x = base_to_camera.transform.translation.x
             transform_stamped.transform.translation.y = base_to_camera.transform.translation.y
             transform_stamped.transform.translation.z = base_to_camera.transform.translation.z
+            transform_stamped.transform.rotation.w = base_to_camera.transform.rotation.w
             transform_stamped.transform.rotation.x = base_to_camera.transform.rotation.x
             transform_stamped.transform.rotation.y = base_to_camera.transform.rotation.y
             transform_stamped.transform.rotation.z = base_to_camera.transform.rotation.z
-            transform_stamped.transform.rotation.w = base_to_camera.transform.rotation.w
+            # transform_stamped.transform.rotation.w = final_quaternion[0]
+            # transform_stamped.transform.rotation.x = final_quaternion[1]
+            # transform_stamped.transform.rotation.y = final_quaternion[2]
+            # transform_stamped.transform.rotation.z = final_quaternion[3]
             self.br.sendTransform(transform_stamped)
 
         # Show the image with detected markers and center points
         cv2.imshow('Aruco Markers', self.cv_image)
         cv2.waitKey(1)  # Adjust the delay as needed
+
+    def rotation_vector_to_quaternion(self,rotation_vector):
+        # Ensure the rotation vector has three elements
+        if len(rotation_vector) != 3:
+            raise ValueError("Rotation vector must have three elements (rx, ry, rz).")
+
+        # Calculate the angle of rotation (magnitude of the rotation vector)
+        angle = np.linalg.norm(rotation_vector)
+
+        # Calculate the unit vector representing the rotation axis
+        if angle == 0.0:
+            # If the angle is zero, return an identity quaternion
+            return np.array([1.0, 0.0, 0.0, 0.0])
+        else:
+            axis = rotation_vector / angle
+
+        # Calculate the quaternion components
+        half_angle = angle / 2.0
+        sin_half_angle = np.sin(half_angle)
+        cos_half_angle = np.cos(half_angle)
+
+        quaternion = np.array([
+            cos_half_angle,
+            sin_half_angle * axis[0],
+            sin_half_angle * axis[1],
+            sin_half_angle * axis[2]
+        ])
+
+        return quaternion
+
+    def euler_to_matrix(self,roll, pitch, yaw):
+        # Create a Rotation object from the Euler angles
+        rotation = R.from_euler('xyz', [roll, pitch, yaw], degrees=False)
         
+        # Get the rotation matrix
+        rotation_matrix = rotation.as_matrix()
+        
+        return rotation_matrix
 
-        '''center_aruco_list, distance_from_rgb_list, angle_aruco_list, width_aruco_list, ids = detect_aruco(self.cv_image)
+    def find_rotation_matrix_to_align_with_up(self,r1):
+        # Define the desired orientation where the green part of the y-axis points up
+        # This corresponds to the identity rotation (no rotation)
+        r2 = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, -1.0],
+        [0.0, 1.0, 0.0]
+    ])
 
-        for i in range(len(ids)):
-            marker_id = ids[i]
-            distance_from_rgb = distance_from_rgb_list[i]
-            angle_aruco = angle_aruco_list[i]
+        # Convert r1 (roll, pitch, yaw) to a rotation matrix
+        r1_matrix = self.euler_to_matrix(r1[0], r1[1], r1[2])
 
-            # Correct the Aruco angle using the correction formula
-            angle_aruco = (0.788 * angle_aruco) - ((angle_aruco ** 2) / 3160)
+        # Calculate the relative rotation from r1 to r2
+        relative_rotation = R.from_matrix(r2) * R.from_matrix(r1_matrix).inv() 
 
-            # Calculate quaternions from roll, pitch, and yaw (where roll and pitch are 0, and yaw is corrected Aruco_angle)
-            roll = 0.0
-            pitch = 0.0
-            yaw = angle_aruco
+        # Get the rotation matrix to align r1 with r2
+        R_matrix = relative_rotation.as_matrix()
 
-            def euler_to_quaternion(roll, pitch, yaw):
-                """
-                Convert Euler angles to a quaternion.
+        return R_matrix
+        
+    
+    def rotate_quaternion_by_matrix(self, roll, pitch, yaw, rotation_matrix):
+        # Convert the roll, pitch, and yaw angles to a rotation matrix
+        rotation = R.from_euler('xyz', [roll, pitch, yaw], degrees=False)
+        rotation_matrix_from_euler = rotation.as_matrix()
 
-                :param roll: Roll angle in radians (rotation around the X-axis).
-                :param pitch: Pitch angle in radians (rotation around the Y-axis).
-                :param yaw: Yaw angle in radians (rotation around the Z-axis).
-                :return: Quaternion as a tuple (w, x, y, z).
-                """
-                cy = math.cos(yaw * 0.5)
-                sy = math.sin(yaw * 0.5)
-                cp = math.cos(pitch * 0.5)
-                sp = math.sin(pitch * 0.5)
-                cr = math.cos(roll * 0.5)
-                sr = math.sin(roll * 0.5)
+        # Multiply the provided rotation matrix by the rotation matrix from Euler angles
+        new_rotation_matrix = np.dot(rotation_matrix, rotation_matrix_from_euler)
 
-                w = cr * cp * cy + sr * sp * sy
-                x = sr * cp * cy - cr * sp * sy
-                y = cr * sp * cy + sr * cp * sy
-                z = cr * cp * sy - sr * sp * cy
+        # next_mat = np.array([[10,0,0],
+        #                        [0,1,0],
+        #                        [0,0,1]])
 
-                return w, x, y, z
+        next_mat = R.from_euler('xyz', [0,0,0], degrees=True).as_matrix()
+        new_rotation_matrix = np.dot(next_mat,new_rotation_matrix)
 
-            # quaternion = tf2_py.quaternion_from_euler(roll, pitch, yaw)
-            quaternion = euler_to_quaternion(roll,pitch,yaw)
-            # Use center_aruco_list to get Realsense depth and log it (divide by 1000 to convert mm to m)
-            # depth_meters = center_aruco_list[i][2] / 1000.0
+        # Convert the new rotation matrix back to a quaternion
+        new_rotation_quaternion = R.from_matrix(new_rotation_matrix).as_quat()
 
-            # Calculate x, y, z based on focal length, center value, and image size
-            cX, cY = center_aruco_list[i][:2]
-            x = distance_from_rgb * (sizeCamX - cX - centerCamX) / focalX
-            y = distance_from_rgb * (sizeCamY - cY - centerCamY) / focalY
-            z = distance_from_rgb
+        print(f"Quat is {new_rotation_quaternion}")
 
-            # Mark the center points on the image frame using cX and cY variables
-            cv2.circle(self.cv_image, (int(cX), int(cY)), 5, (0, 0, 255), -1)
-
-            # Publish transform between camera_link and Aruco marker center position
-            transform_stamped = TransformStamped()
-            transform_stamped.header.stamp = self.get_clock().now().to_msg()
-            transform_stamped.header.frame_id = 'camera_link'
-            transform_stamped.child_frame_id = 'cam_{}'.format(marker_id)
-            transform_stamped.transform.translation.x = x
-            transform_stamped.transform.translation.y = y
-            transform_stamped.transform.translation.z = z
-            transform_stamped.transform.rotation.x = quaternion[0]
-            transform_stamped.transform.rotation.y = quaternion[1]
-            transform_stamped.transform.rotation.z = quaternion[2]
-            transform_stamped.transform.rotation.w = quaternion[3]
-            self.br.sendTransform(transform_stamped)
-
-            # Lookup transform between base_link and obj frame to publish the TF
-            try:
-                base_to_camera = self.tf_buffer.lookup_transform('base_link', 'cam_{}'.format(marker_id), rclpy.time.Time())
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                continue
-
-            # Publish TF between object frame and base_link
-            transform_stamped.header.frame_id = 'base_link'
-            transform_stamped.child_frame_id = 'obj_{}'.format(marker_id)
-            transform_stamped.transform.translation.x = base_to_camera.transform.translation.x
-            transform_stamped.transform.translation.y = base_to_camera.transform.translation.y
-            transform_stamped.transform.translation.z = base_to_camera.transform.translation.z
-            transform_stamped.transform.rotation.x = base_to_camera.transform.rotation.x
-            transform_stamped.transform.rotation.y = base_to_camera.transform.rotation.y
-            transform_stamped.transform.rotation.z = base_to_camera.transform.rotation.z
-            transform_stamped.transform.rotation.w = base_to_camera.transform.rotation.w
-            self.br.sendTransform(transform_stamped)
-
-        # Show the image with detected markers and center points
-        cv2.imshow('Aruco Markers', self.cv_image)
-        cv2.waitKey(1)  # Adjust the delay (e.g., 1 millisecond) as needed'''
+        return new_rotation_quaternion
 
     def euler_to_quaternion(self, roll, pitch, yaw):
         """
