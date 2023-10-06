@@ -4,7 +4,7 @@
 # Author List:      Tahsin Khan
 # Filename:         task2b.py
 # Functions:        
-# Global variables: 
+# Global variables: pose_1 , pose_2 , drop_pose , quat_1 , quat_2 , quat_3  , pose_box_1 , pose_box_2 , pose_box_3 , quat_box , collisoon_objects
 '''
 #!/usr/bin/env python3
 
