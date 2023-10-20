@@ -9,4 +9,4 @@
 
 1. Task 2A : Correct the aruco box estimation code in task1A , use the TF recieved of the boxes w.r.t to base_link now need to use move it servo to pick the boxes , use the gripper service to grab it and place at drop pose . 
 
-2. Task 2B : 
+2. Task 2B : Docking , attaching the rack to ebot and navigation ( using nav2 ) to the given poses   
