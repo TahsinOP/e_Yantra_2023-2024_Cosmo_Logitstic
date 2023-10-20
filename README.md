@@ -1,4 +1,4 @@
-# e_Yantra_2023-2024_Cosmo_Logistic
+# Cosmo Logistic - eYantra 2023-24
 
 ## Task 1: ( Completed )
 1. Write proper and clean code for Task 1A (correct the hard code part of one box).
