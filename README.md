@@ -12,6 +12,8 @@
 2. Task 2B : Docking , attaching the rack to ebot and navigation ( using nav2 ) to the given poses
    
    Docking : Use the given custom service , use ultrasonic sensors for linear allignment and use the odometery data for orientation allignment .
+   
    Racking : Attach and detach the rack to box using the custom services given
+   
    Navigation : Combine all the three in one code , first use nav2,go_to_pose to go the Rack1 ( map the warehouse again ) , call the docking service and allign the ebot with the rack , attach the 
    rack go to drop pose and detach the rack  
