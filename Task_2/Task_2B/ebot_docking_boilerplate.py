@@ -20,6 +20,10 @@ from tf_transformations import euler_from_quaternion
 from ebot_docking.srv import DockSw  # Import custom service message
 import math, statistics
 
+xy_tolerance = 0.25 
+pre_dock_x = 0.50
+pre_dock_y = 4.55
+
 # Define a class for your ROS2 node
 class MyRobotDockingController(Node):
 
@@ -90,27 +94,35 @@ class MyRobotDockingController(Node):
     # Main control loop for managing docking behavior
     def controller_loop(self):
 
-        if self.is_docking:
-            # Calculate angular correction based on desired orientation
-            if self.orientation_dock:
-                target_angle = math.atan2(self.dock_pose[1] - self.robot_pose[1], self.dock_pose[0] - self.robot_pose[0])
+        angular_speed = 0.0
+        if self.is_docking :
+            if (self.robot_pose[0] >= pre_dock_x - xy_tolerance or self.robot_pose[0] <= pre_dock_x + xy_tolerance ) and (self.robot_pose[1] >= pre_dock_y - xy_tolerance or self.robot_pose[1] <= pre_dock_y + xy_tolerance) : 
+
+                # Calculate angular correction to align the robot with the desired orientation
+                target_angle = self.dock_pose[1] 
                 angular_error = self.normalize_angle(target_angle - self.robot_pose[2])
-                angular_speed = 0.5 * angular_error  # P-controller for angular correction
-            else:
-                angular_speed = 0.0  # No angular correction
+                angular_speed = 0.7 * angular_error  # P-controller for angular correction
+                velocity_msg = Twist()
+                velocity_msg.angular.z = angular_speed
 
-            # Calculate linear correction based on ultrasonic sensor data
-            if self.linear_dock:
-                linear_speed = self.calculate_linear_correction()  # Calculate linear correction using ultrasonic sensors
-            else:
-                linear_speed = 0.0  # No linear correction
+                self.velocity_pub.publish(velocity_msg)
+                
 
-            # Publish velocity commands
-            velocity_msg = Twist()
-            velocity_msg.angular.z = angular_speed
-            velocity_msg.linear.x = linear_speed
-            self.velocity_pub.publish(velocity_msg)
-    
+                # Check if the robot is aligned within a threshold
+                if abs(angular_error) < 0.1:
+                   self.dock_aligned = True
+                   self.get_logger().info("Robot is aligned for docking.")
+                else:
+                   self.get_logger().info("Aligning robot...")
+
+            # else:
+            #     # Calculate linear correction based on ultrasonic sensor data
+            #     linear_speed = self.calculate_linear_correction()
+            #     velocity_msg = Twist()
+            #     velocity_msg.angular.z = angular_speed
+            #     velocity_msg.linear.x = linear_speed
+            #     self.velocity_pub.publish(velocity_msg)
+                
     def calculate_linear_correction(self):
         # Implement linear correction based on ultrasonic sensor data
         # Use ultrasonic sensor data to find the rear distance and adjust linear_speed
@@ -118,7 +130,7 @@ class MyRobotDockingController(Node):
 
         if rear_distance > 1.0:
             linear_speed = 0.2  # Move forward when rear distance is safe
-        elif rear_distance > 0.2:
+        elif rear_distance < 0.3:
             linear_speed = 0.0  # Stop when getting closer to the rack
         else:
             linear_speed = -0.2  # Move back if too close to an obstacle
@@ -171,7 +183,9 @@ def main(args=None):
     my_robot_docking_controller = MyRobotDockingController()
 
     executor = MultiThreadedExecutor()
+
     executor.add_node(my_robot_docking_controller)
+    
 
     executor.spin()
 
