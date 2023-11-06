@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 
-## Overview
 
-# ###
-# This ROS2 script is designed to control a robot's docking behavior with a rack. 
-# It utilizes odometry data, ultrasonic sensor readings, and provides docking control through a custom service. 
-# The script handles both linear and angular motion to achieve docking alignment and execution.
-# ###
 
-# Import necessary ROS2 packages and message types
+# Team ID:          CL#1868
+# Author List:		Tahsin Khan 
+# Filename:		    ebot_docking_service_task2b.py
+# Functions:        odometery_callback,ultrasonic_rl_callback,ultrasonic_rr_callback,normalize_angle,controller_loop,calculate_linear_correction,
+#                   dock_control_callback, main 
+#			       
+# Nodes:		   
+#                
+#			        Publishing Topics  - [ cmd_vel,odom]
+#                   Subscribing Topics - [/ultrasonic_rl/scan ,/ultrasonic_rr/scan ]
+
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
@@ -19,10 +23,6 @@ from rclpy.executors import MultiThreadedExecutor
 from tf_transformations import euler_from_quaternion
 from ebot_docking.srv import DockSw  # Import custom service message
 import math, statistics
-
-xy_tolerance = 0.25
-pre_dock_x = 0.4
-pre_dock_y = 4.60
 
 # Define a class for your ROS2 node
 class MyRobotDockingController(Node):
@@ -78,11 +78,6 @@ class MyRobotDockingController(Node):
     # Extract and update the value from the right ultrasonic sensor
         self.usrright_value = msg.range
 
-
-
-    # Callback function for the right ultrasonic sensor
-    # Implement the right ultrasonic sensor callback here
-
     # Utility function to normalize angles within the range of -π to π (OPTIONAL)
     def normalize_angle(self, angle):
         while angle > math.pi:
@@ -100,8 +95,6 @@ class MyRobotDockingController(Node):
         
         if self.is_docking :
                 
-           
-
              # Calculate angular correction to align the robot with the desired orientation
             target_angle = self.dock_pose[1] 
             angular_error = self.normalize_angle(target_angle - self.robot_pose[2])
@@ -111,7 +104,6 @@ class MyRobotDockingController(Node):
 
             self.velocity_pub.publish(velocity_msg)
                 
-
                 # Check if the robot is aligned within a threshold
             if abs(angular_error) < 0.03:
                 self.dock_aligned = True
@@ -138,9 +130,6 @@ class MyRobotDockingController(Node):
                     self.velocity_pub.publish(velocity_msg)
                     self.get_logger().info(f"Linear correction: {linear_speed}")
 
-
-
-
     def calculate_linear_correction(self):
         # Implement linear correction based on ultrasonic sensor data
         # Use ultrasonic sensor data to find the rear distance and adjust linear_speed
@@ -154,21 +143,9 @@ class MyRobotDockingController(Node):
             linear_speed = -0.2  # Move back if too close to an obstacle
 
         return linear_speed
-    
-    def is_robot_aligned(self):
-       
-    # Calculate the angular error between the current robot orientation and the desired orientation
-       target_orientation = self.dock_pose[1]
-       angular_error = self.normalize_angle(target_orientation - self.robot_pose[2])
-
-    # Check if the angular error is within an acceptable tolerance
-       return abs(angular_error) < 0.1 # Adjust the threshold as needed
-
-
 
     # Callback function for the DockControl service
     def dock_control_callback(self, request, response):
-
 
         self.is_docking = True  # Start docking process
         self.dock_aligned = False  # Reset alignment flag
@@ -178,7 +155,6 @@ class MyRobotDockingController(Node):
 
         # Log a message indicating that docking has started
         self.get_logger().info("Docking started!")
-
 
         # Set the service response indicating success
         response.success = True
@@ -195,7 +171,6 @@ def main(args=None):
 
     executor.add_node(my_robot_docking_controller)
     
-
     executor.spin()
 
     my_robot_docking_controller.destroy_node()

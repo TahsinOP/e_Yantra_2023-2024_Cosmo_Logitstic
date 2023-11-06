@@ -8,36 +8,33 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Twist
-
 from sensor_msgs.msg import Range 
-
 from ebot_docking.srv import DockSw
 from tf_transformations import euler_from_quaternion
-
 from linkattacher_msgs.srv import AttachLink, DetachLink  
 import math
 
-"""
-Basic navigation demo to go to pose.
+# Team ID:          CL#1868
+# Author List:		Tahsin Khan 
+# Filename:		    ebot_nav2_cmd_task2b.py
 
-
-
-"""
-
+# Functions:        normalize_angle,left_sensor_callback,right_sensor_callback,odometry_callback_for_trigger,vel_callback,navigate_to_home_pose,
+#                   navigate_to_arm_pose,navigate_and_dock,trigger_docking_service_intial,trigger_docking_service_final,trigger_attachment_service,
+#                   trigger_dettachment_service ,main
+#			        
+# Nodes:		  
+#			        Publishing Topics  - 
+#                   Subscribing Topics - [ cmd_vel,odom,/ultrasonic_rl/scan,/ultrasonic_rr/scan]
 
 class NavigationAndDockingNode(Node):
     def __init__(self):
         super().__init__('navigation_and_docking_node')
 
-        
-        
         self.navigator = BasicNavigator()
         self.robot_pose = [0.0, 0.0, 0.0]
         self.docking_attempts = 0
         self.reached_2nd_dock_pose = False
         self.docked = False
-        
-
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
         self.link_attach_client = self.create_client(AttachLink, '/ATTACH_LINK')
         self.link_detach_client = self.create_client(DetachLink, '/DETACH_LINK')
@@ -85,36 +82,8 @@ class NavigationAndDockingNode(Node):
         
         self.vel_x = msg.linear.x 
         self.ang_z = msg.angular.z
-
-
-       
-
-      
              
-
-
-
         
-
-      
-        
-
-           
-
-
-     
-    def check_orientation_reached(self, target_orientation, tolerance):
-        current_orientation = self.robot_pose[2]
-
-        angular_error = target_orientation - current_orientation
-
-        if abs(angular_error) < tolerance:
-            return True  # Robot has reached the required orientation
-        else:
-            return False  #    
-    
-
-
     def navigate_to_home_pose(self):
         # Define the goal pose for the subsequent navigation
         goal_pose = PoseStamped()
@@ -137,25 +106,9 @@ class NavigationAndDockingNode(Node):
 
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation to the home pose succeeded.')
-
             
         else:
             self.get_logger().error('Navigation to the home pose failed.')
-
-    def detach_triggerer(self) :
-
-        while  not  self.docked : 
-
-            print('waiting for self.dock to be true ')
-        
-        
-
-        self.trigger_detachment_service()
-    
-
-
-    
-
 
     def navigate_to_arm_pose(self):
         # Define the goal pose for the subsequent navigation
@@ -183,11 +136,8 @@ class NavigationAndDockingNode(Node):
 
             self.trigger_docking_service_final()
         else:
-            self.get_logger().error('Navigation to the new pose failed.')
-        
-
+            self.get_logger().error('Navigation to the new pose failed.')       
     
-
     def navigate_and_dock(self):
         # Define the goal pose
         goal_pose = PoseStamped()
@@ -215,7 +165,6 @@ class NavigationAndDockingNode(Node):
 
     def trigger_docking_service_intial(self):
 
-
         self.get_logger().info("Triggering the docking service ")
         dock_control_request = DockSw.Request()
         dock_control_request.linear_dock = True  # Enable linear correction
@@ -240,11 +189,8 @@ class NavigationAndDockingNode(Node):
             self.get_logger().error("Docking service failed.")
 
     def trigger_docking_service_final(self):
-
        
-       
-        
-
+               
         self.get_logger().info("Triggering the docking service ")
         dock_control_request = DockSw.Request()
         dock_control_request.linear_dock = True# Enable linear correction
@@ -261,65 +207,16 @@ class NavigationAndDockingNode(Node):
 
             while not ((self.vel_x < 0.1) and (self.ang_z < 0.1) and (self.normalize_angle(self.robot_pose[2]) < - 3.1)):
                
-               print((self.normalize_angle(self.robot_pose[2])))
-               
                rclpy.spin_once(self)
                
                self.get_logger().info('Second docking is not complete. Keep waiting.')
               
-               
             self.trigger_detachment_service()
-            
-
-                
-            # Wait for the robot to come to rest
-            
-
-            
-
-
-            
+                    
         else:
 
             self.get_logger().error("Docking service failed.")
 
-
-
-
-        # if self.docked :
-
-        #     self.get_logger().info("Docking service succeeded. Waiting for robot to come to rest.")
-
-            
-
-            
-
-        #     # while not  abs(angular_error) < 0.0525 :
-
-        #     #     print (abs(angular_error),self.robot_pose[2])
-
-
-
-        #     self.get_logger().info("Robot is at oreintation. Triggering detachment service.")
-
-            
-
-            
-        #     self.trigger_detachment_service()
-
-
-        #     # Wait for the robot to come to rest
-        #     # while not ( self.left_sensor_distance < 0.15 and self.right_sensor_distance < 0.15):
-        #     #     rclpy.spin_once(self)
-
-        #     # self.get_logger().info("Robot is near the rack . Triggering attachment service.")
-
-        #     # self.trigger_detachment_service()
-        # else:
-        #     self.get_logger().error("Docking service failed.")
-
-
- 
 
     def trigger_attachment_service(self):
 
@@ -344,9 +241,7 @@ class NavigationAndDockingNode(Node):
           self.get_logger().error("Attachment service failed.")
 
     def trigger_detachment_service(self):
-
         
-
         self.get_logger().info("Triggering the detachment service")
         detachment_request = DetachLink.Request()
         detachment_request.model1_name = 'ebot'
@@ -366,13 +261,6 @@ class NavigationAndDockingNode(Node):
           
           self.get_logger().error("Attachment service failed.")
 
-        
-
-
-        
-          
-        # self.get_logger().error("Detachment service failed.")
-
 
 def main(args=None):
 
@@ -382,15 +270,11 @@ def main(args=None):
     
     ebot_nav2_cmd_node.navigate_and_dock()
      
-   
-
     rclpy.spin(ebot_nav2_cmd_node)
 
     ebot_nav2_cmd_node.destroy_node()
 
     rclpy.shutdown()
-
-
 
 if __name__ == '__main__':
 
