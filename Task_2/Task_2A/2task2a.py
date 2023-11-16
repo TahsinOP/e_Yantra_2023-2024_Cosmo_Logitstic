@@ -1,24 +1,19 @@
 '''
 # Team ID:          1868
 # Theme:            Cosmo Logistic 
-# Author List:      Tahsin Khan
-# Filename:         task2b.py
+# Author List:      Tahsin Khan , Chinmaya Sahu
+# Filename:        2task2b.py
 # Functions:        
 # Global variables: 
 '''
 #!/usr/bin/env python3
 
-#Importing required libraries for MoveIt 
-
-from tf_transformations import euler_from_quaternion
 from scipy.spatial.transform import Rotation as R
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
 from tf2_ros import TransformException
-from geometry_msgs.msg import PoseStamped
 from linkattacher_msgs.srv import AttachLink
 from linkattacher_msgs.srv import DetachLink
 from std_srvs.srv import Trigger 
-from copy import deepcopy
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.duration import Duration
@@ -26,8 +21,6 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 from pymoveit2.robots import ur5
-from rclpy.qos import QoSProfile
-import tf2_ros
 import math
 from threading import Thread
 import rclpy
@@ -35,29 +28,15 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from pymoveit2 import MoveIt2
 from pymoveit2.robots import ur5
-from tf2_ros import buffer
-
 from tf2_ros import TransformListener
-
-#!/usr/bin/env python3
-
 from tf2_ros import TransformException
-from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 import rclpy
-import tf2_ros
-
-
 from threading import Thread
-
 from rclpy.time import Time
-
 import rclpy
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
-from geometry_msgs.msg import TransformStamped
-
-# ... (Previous code)
 
 class TFListener(Node):
     def __init__(self):
@@ -74,35 +53,7 @@ class TFListener(Node):
         # Create a timer to periodically check for transforms
         self.timer = self.create_timer(1.0, self.lookup_transforms)
         self.first_transform_received = False  # Flag to track the first transform
-        
-
-    # def start_servo_service(self):
-
-    #     # Create a client for the start_servo service
-    #     start_servo_client = self.create_client(Trigger, '/servo_node/start_servo')
-
-    #     # Wait for the service to be available
-    #     if not start_servo_client.wait_for_service(timeout_sec=2.0):
-    #         self.get_logger().warn("Service '/servo_node/start_servo' not available. Is Servo properly configured?")
-    #     else:
-    #         # Create a request for the start_servo service
-    #         request = Trigger.Request()
-
-    #         # Call the start_servo service
-    #         future = start_servo_client.call_async(request)
-    #         rclpy.spin_until_future_complete(self, future)
-
-    #         if future.result() is not None:
-    #             if future.result().success:
-    #                 self.get_logger().info("Servo controller started successfully.")
-    #             else:
-    #                 self.get_logger().error("Failed to start Servo controller: %s", future.result().message)
-    #         else:
-    #             self.get_logger().error("Service call failed. Unable to start Servo controller.")
-
-
-   
-
+      
     def lookup_transforms(self):
         try:
             # Lookup transforms and store them in the lists
@@ -128,14 +79,10 @@ class TFListener(Node):
 
                 self.first_transform_received = True
                 
-                self.timer.reset()
-
-                
+                self.timer.reset()                
 
         except TransformException as e:
             self.get_logger().warning(f"Failed to lookup transforms: {e}")
-
- 
 
     def print_transforms(self):
         # Print or process the stored transforms
@@ -154,10 +101,7 @@ class ServoNode(Node):
         # Create callback group that allows execution of callbacks in parallel without restrictions
         callback_group = ReentrantCallbackGroup()
         self.attached = False
-
-
-        
-                                     
+                                       
         self.tf_buffer = Buffer(Duration(seconds=10.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -169,8 +113,6 @@ class ServoNode(Node):
         self.target_rotations = target_rotations
 
         self.start_servo_service()
-
-     
         print(f"target pose is {self.target_poses}")
 
         self.current_target_index = 0
@@ -200,14 +142,6 @@ class ServoNode(Node):
         
         self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
         
-    # def start_servo_again(self):
-
-    #     if self.box_done : 
-
-    #         # self.timer.cancel()
-
-    #         self.start_servo_service( )
-        
     def start_servo_service(self):
 
         # Create a client for the start_servo service
@@ -225,9 +159,7 @@ class ServoNode(Node):
             rclpy.spin_until_future_complete(self, future)
 
             if future.result() is not None:
-                if future.result().success:
-
-                   
+                if future.result().success:                   
 
                     self.get_logger().info("Servo controller started successfully.")
                 else:
@@ -255,18 +187,13 @@ class ServoNode(Node):
 
                 if future.result().success:
                     self.get_logger().info("Servo controller stopped successfully.")
-                    
-                   
-                    self.move_it_controller.move_to_home_and_drop_pose_after_servoing()
-
-                   
-                  
+                      
+                    self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
 
                 else:
                     self.get_logger().error("Failed to stop Servo controller: %s", future.result().message)
             else:
                 self.get_logger().error("Service call failed. Unable to stop Servo controller.")
-
 
  
     def servo_to_target(self):
@@ -285,11 +212,8 @@ class ServoNode(Node):
                 target_rot_euler = list(R.from_quat(target_rotation).as_euler('xyz'))
                 current_orientation_euler = list(R.from_quat(current_orientation).as_euler('xyz'))
 
-                yaw = target_rot_euler[2] - current_orientation_euler[2]
+                yaw = target_rot_euler[2] - current_orientation_euler[2]     
 
-                # print(yaw)
-
-                # print(target_rot_euler)
                 while yaw < -math.pi:
                     yaw += 2*math.pi
 
@@ -302,17 +226,14 @@ class ServoNode(Node):
                 elif abs(yaw - -math.pi/2) < error:
 
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
-               
-
-                
+                               
                 
                 current_pose = [
                     trans.transform.translation.x,
                     trans.transform.translation.y,
                     trans.transform.translation.z
                 ]
-
-                    
+                 
                 
                 diff = [target_pose[i] - current_pose[i] for i in range(3)]
 
@@ -327,9 +248,7 @@ class ServoNode(Node):
                     if (self.current_target_index%2) == 1 :
 
                         
-                        self.test_function()
-                        
-                        # self.stop_servo_service()
+                        self.test_function()                     
 
                         self.detach_link_service()
 
@@ -337,31 +256,18 @@ class ServoNode(Node):
 
                         self.box_done = True
 
-                        # self.start_servo_again()
-
                         print ( self.box_done) 
 
                         if (self.box_done):
 
                             self.timer.reset()
 
-                            print("timer has been shut down")
-
-                           
-
-                        
-
-                        
+                            print("timer has been shut down")           
 
                        
                     self.current_target_index += 1
 
                     print(f"Current taget index increased{self.current_target_index}")
-
-
-                    # self.start_servo_service()
-
-    
 
                     
                 else:
@@ -405,12 +311,10 @@ class ServoNode(Node):
 
             if future.result().success:
 
-            
                
                 self.get_logger().info("Attachment successful.")
                 self.attached = True
-                self.attaching = False
-               
+                self.attaching = False   
 
             else:
                 self.get_logger().error("Attachment failed: %s", future.result().message)
@@ -420,9 +324,6 @@ class ServoNode(Node):
         
     def detach_link_service(self):
 
-       
-        # print('timer has been cancelled')
-        # Create a client for the AttachLink service
         detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
 
         while not  detach_link_client.wait_for_service(timeout_sec=1.0):
@@ -450,9 +351,7 @@ class ServoNode(Node):
                 self.get_logger().error("detachment failed: %s", future.result().message)
         else:
             self.get_logger().info("gg")
-    
-    
-
+       
         
 class MoveMultipleJointPositions(Node):
 
@@ -462,16 +361,6 @@ class MoveMultipleJointPositions(Node):
         self.moveit2 = None
         self.detached = False
         self.movit_done = False
-
-        # self.moveit2 = MoveIt2(
-        #     node=self,
-        #     joint_names=ur5.joint_names(),
-        #     base_link_name=ur5.base_link_name(),
-        #     end_effector_name=ur5.end_effector_name(),
-        #     group_name=ur5.MOVE_GROUP_ARM,
-        #     callback_group=ReentrantCallbackGroup()
-        # )
-        
 
     def move_to_multiple_joint_positions(self, *joint_positions):
 
@@ -500,13 +389,6 @@ class MoveMultipleJointPositions(Node):
         executor.add_node(self)
         executor = Thread(target= executor.spin, daemon=True, args=())
         executor.start()
-
-        pose_name = "home_pose"
-
-        # self.declare_parameter(pose_name,joint_position)
-
-        # joint_positions = self.get_parameter(pose_name).get_parameter_value().double_array_value
-        # self.get_logger().info(f"Moving to {pose_name}: {list(joint_positions)}")
         self.moveit2.move_to_configuration(joint_position)
         self.moveit2.wait_until_executed()
     
@@ -552,15 +434,13 @@ def main(args=None):
     rclpy.init(args=args)
     
     tf_listener_node = TFListener()
-    # tf_listener_node.start_servo_service()
 
     while not tf_listener_node.first_transform_received:
 
         rclpy.spin_once(tf_listener_node, timeout_sec=1.0)
     
     tf_listener_node.get_logger().info("Tf Listener Node is bieng shut down gg")
-    # tf_listener_node.destroy_node()
-
+   
 
     for obj_name in ["obj_1","obj_3","obj_49"]:
 
@@ -586,8 +466,6 @@ def main(args=None):
         elif abs(yaw - math.pi) < error:
             test[1] -= 0.18     #Right hand side while facing the racks
             
-
-        
         
         drop_pose = [-0.47, 0.12, 0.397]
 
@@ -595,14 +473,9 @@ def main(args=None):
                     ]
         target_rotations = [tf_listener_node.rotations[obj_name],tf_listener_node.rotations[obj_name]
                         ]
-        
-        # # callback_group = ReentrantCallbackGroup()
 
         servo_node = ServoNode(target_poses,target_rotations,obj_name)
-        
 
-        # # if servo_node.box_done :
-    
         
         while not servo_node.box_done :
 
@@ -614,41 +487,7 @@ def main(args=None):
 
     print('gggs')
 
-    
 
-
-        
-    
-
-    
-    
-
-         
-    #     print("timer_1 is cancelled")
-
-    
-
-    # target_poses_1 =  [tf_listener_node.translations["obj_1"],test,
-    #                 ]
-    
-    # target_rotations_1 = [tf_listener_node.rotations["obj_1"],tf_listener_node.rotations["obj_1"]]
-
-                    
-    # servo_node_2 = ServoNode(target_poses_1,target_rotations_1)
-
-    
-  
-
-    # executor.add_node(servo_node_2)
-
-    # executor.spin()
-
-    # executor.spin()
-
-
-
-    # rclpy.spin(tf_listener_node)
-   
     rclpy.shutdown()
 
 if __name__ == '__main__':
