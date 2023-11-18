@@ -16,4 +16,5 @@
    Racking : Attach and detach the rack to box using the custom services given
    
    Navigation : Combine all the three in one code , first use nav2,go_to_pose to go the Rack1 ( map the warehouse again ) , call the docking service and allign the ebot with the rack , attach the 
-   rack go to drop pose and detach the rack  
+   rack go to drop pose and detach the rack
+# Stage - 2 :
