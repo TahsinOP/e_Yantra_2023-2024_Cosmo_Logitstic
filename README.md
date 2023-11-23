@@ -1,7 +1,7 @@
 # Cosmo Logistic - eYantra 2023-24
 ### Team Members : Tahsin Khan,Chinmaya Sahu 
 ### Team ID : 1868
-# Stage - 1 : 
+# Stage - 1 : ( Completed ) 
 ## Task 1: - ( Completed )
 1. Write proper and clean code for Task 1A (correct the hard code part of one box) - ( Completed )
 2. Implement and learn the servo method for Task 1B (optional) - ( Completed )
