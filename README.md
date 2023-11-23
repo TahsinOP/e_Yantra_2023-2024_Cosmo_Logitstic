@@ -13,7 +13,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 
 2. Task 2B (Completed) : Docking , attaching the rack to ebot and navigation ( using nav2 ) to the given poses
    
-   Docking : Use the given custom service , use ultrasonic sensors for linear allignment and use the odometery data for orientation allignment .
+   Docking : Use the given custom service , use ultrasonic sensors for linear allignment and use the odometery data for orientation allignment 
    
    Racking : Attach and detach the rack to box using the custom services given
    
