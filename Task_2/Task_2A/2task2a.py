@@ -66,7 +66,7 @@ class TFListener(Node):
             self.translations["obj_3"] = (transform3.transform.translation.x, transform3.transform.translation.y, transform3.transform.translation.z)
             self.translations["obj_49"] = (transform49.transform.translation.x, transform49.transform.translation.y, transform49.transform.translation.z)
 
-            # Extract and store rotations
+            # # Extract and store rotations
             self.rotations["obj_1"] = (transform1.transform.rotation.x, transform1.transform.rotation.y, transform1.transform.rotation.z, transform1.transform.rotation.w)
             self.rotations["obj_3"] = (transform3.transform.rotation.x, transform3.transform.rotation.y, transform3.transform.rotation.z, transform3.transform.rotation.w)
             self.rotations["obj_49"] = (transform49.transform.rotation.x, transform49.transform.rotation.y, transform49.transform.rotation.z, transform49.transform.rotation.w)
