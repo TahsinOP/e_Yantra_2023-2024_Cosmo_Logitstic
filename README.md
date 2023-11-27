@@ -25,4 +25,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/c13fb30d-3859-417b-b385-ca64f45a9aaa
    
 # Stage - 2 : (Selected) 
-## Task 3 : ( Yet to start ) 
+## Task 3 : ( 14th December : Deadline ) 
+
+1. Task 3A :
+2. Task 3B : 
