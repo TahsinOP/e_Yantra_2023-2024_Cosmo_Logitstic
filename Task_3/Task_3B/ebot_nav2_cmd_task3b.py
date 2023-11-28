@@ -11,8 +11,11 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Range 
 from ebot_docking.srv import DockSw
 from tf_transformations import euler_from_quaternion
+from scipy.spatial.transform import Rotation as R
 from linkattacher_msgs.srv import AttachLink, DetachLink  
 import math
+import yaml
+import os
 
 # Team ID:          CL#1868
 # Author List:		Tahsin Khan 
@@ -27,7 +30,7 @@ import math
 #                   Subscribing Topics - [ cmd_vel,odom,/ultrasonic_rl/scan,/ultrasonic_rr/scan]
 
 class NavigationAndDockingNode(Node):
-    def __init__(self):
+    def __init__(self, config_params):
         super().__init__('navigation_and_docking_node')
 
         self.navigator = BasicNavigator()
@@ -50,6 +53,16 @@ class NavigationAndDockingNode(Node):
             '/ultrasonic_rr/scan',  # Replace with the actual topic name
             self.right_sensor_callback,
             10)
+        
+        self.config_params = config_params
+        self.package_id = self.config_params['package_id'][0]
+        self.rack_info = self.config_params['position'][int(self.package_id)-1][f"rack{self.package_id}"]
+        self.rack_pose_x = self.rack_info[0]
+        self.rack_pose_y = self.rack_info[1]
+        self.rack_orientation = self.rack_info[2]
+
+        print(f"The package id is {self.package_id}")
+        print(f"The required rack information is {self.rack_info}")
 
     def normalize_angle(self, angle):
 
@@ -86,6 +99,10 @@ class NavigationAndDockingNode(Node):
         
     def navigate_to_home_pose(self):
         # Define the goal pose for the subsequent navigation
+        pose_euler = [0.0,0.0,0.0]
+        euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
+        pose_quat = list(euler_rot.as_quat())
+
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
@@ -93,8 +110,8 @@ class NavigationAndDockingNode(Node):
         goal_pose.pose.position.y = 0.0 # Replace with your desired Y coordinate
 
         # goal_pose.pose.orientation = Quaternion(z= 3.14, w=1.0)
-        goal_pose.pose.orientation.z = 0.00# Replace with your desired orientation
-        goal_pose.pose.orientation.w = 1.00 # Replace with your desired orientation
+        goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
+        goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
 
         # Navigate to the new goal pose
         self.navigator.goToPose(goal_pose)
@@ -111,16 +128,31 @@ class NavigationAndDockingNode(Node):
             self.get_logger().error('Navigation to the home pose failed.')
 
     def navigate_to_arm_pose(self):
+
+
+        if self.rack_orientation == 1.57 : 
+
+            self.arm_orientation = 2.291
+         
+
+        elif self.rack_orientation == 3.14:
+
+            self.arm_orientation = -2.291
+       
+
+        pose_euler = [0,0,self.arm_orientation]
+        euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
+        pose_quat = list(euler_rot.as_quat())
         # Define the goal pose for the subsequent navigation
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.80 # Replace with your desired X coordinate
+        goal_pose.pose.position.x = 0.8 # Replace with your desired X coordinate
         goal_pose.pose.position.y = -2.455  # Replace with your desired Y coordinate
 
         # goal_pose.pose.orientation = Quaternion(z= 3.14, w=1.0)
-        goal_pose.pose.orientation.z = -0.5774# Replace with your desired orientation
-        goal_pose.pose.orientation.w = 0.8166 # Replace with your desired orientation
+        goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
+        goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
 
         # Navigate to the new goal pose
         self.navigator.goToPose(goal_pose)
@@ -139,14 +171,31 @@ class NavigationAndDockingNode(Node):
             self.get_logger().error('Navigation to the new pose failed.')       
     
     def navigate_and_dock(self):
+
+        if self.rack_orientation == 1.57 : 
+
+            self.dock_orientation = 1.00
+            self.rack_pose_x = 2.25
+            self.rack_pose_y = -7.4
+
+        elif self.rack_orientation == 3.14:
+
+            self.dock_orientation = 0.0
+            self.rack_pose_x = 0.40
+            self.rack_pose_y = 4.60
+
+        pose_euler = [0,0,self.dock_orientation]
+        euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
+        pose_quat = list(euler_rot.as_quat())
+        print(pose_quat)
         # Define the goal pose
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.40
-        goal_pose.pose.position.y = 4.60
-        goal_pose.pose.orientation.z = 0.90
-        goal_pose.pose.orientation.w = 0.40
+        goal_pose.pose.position.x = self.rack_pose_x
+        goal_pose.pose.position.y = self.rack_pose_y
+        goal_pose.pose.orientation.z = pose_quat[2]
+        goal_pose.pose.orientation.w = pose_quat[3]
 
         # Navigate to the goal pose
         self.navigator.goToPose(goal_pose)
@@ -165,13 +214,15 @@ class NavigationAndDockingNode(Node):
 
     def trigger_docking_service_intial(self):
 
+        print(self.rack_orientation)
+
         self.get_logger().info("Triggering the docking service ")
         dock_control_request = DockSw.Request()
         dock_control_request.linear_dock = True  # Enable linear correction
         dock_control_request.orientation_dock = True  # Enable angular correction
         dock_control_request.distance = 0.0 # Specify the desired distance
-        dock_control_request.orientation = 3.14  # Specify the desired orientation
-        dock_control_request.rack_no = 'rack1'  # Specify the rack number
+        dock_control_request.orientation = (self.rack_orientation)  # Specify the desired orientation
+        dock_control_request.rack_no = f"rack{int(self.package_id)}"  # Specify the rack number
 
         future = self.docking_service_client.call_async(dock_control_request)
         rclpy.spin_until_future_complete(self, future)
@@ -196,8 +247,8 @@ class NavigationAndDockingNode(Node):
         dock_control_request.linear_dock = True# Enable linear correction
         dock_control_request.orientation_dock = False # Enable angular correction
         dock_control_request.distance = 0.0 # Specify the desired distance
-        dock_control_request.orientation = -3.14  # Specify the desired orientation
-        dock_control_request.rack_no = 'rack1'  # Specify the rack number
+        dock_control_request.orientation = 3.14  # Specify the desired orientation
+        dock_control_request.rack_no = f"rack{self.package_id}"  # Specify the rack number
 
         future = self.docking_service_client.call_async(dock_control_request)
         rclpy.spin_until_future_complete(self, future)
@@ -205,7 +256,7 @@ class NavigationAndDockingNode(Node):
         if future.result() is not None:
             self.get_logger().info("Docking service succeeded. Waiting for robot to come to rest.")
 
-            while not ((self.vel_x < 0.1) and (self.ang_z < 0.1) and (self.normalize_angle(self.robot_pose[2]) < - 3.12)):
+            while not ((self.vel_x < 0.1) and (self.ang_z < 0.1) and (self.normalize_angle(self.robot_pose[2])>3.12)):
                
                rclpy.spin_once(self)
                
@@ -224,7 +275,7 @@ class NavigationAndDockingNode(Node):
         attachment_request = AttachLink.Request()
         attachment_request.model1_name = 'ebot'
         attachment_request.link1_name = 'ebot_base_link'
-        attachment_request.model2_name = 'rack1'  # Replace with the actual rack name
+        attachment_request.model2_name = f"rack{self.package_id}"  # Replace with the actual rack name
         attachment_request.link2_name = 'link'
 
         attachment_future = self.link_attach_client.call_async(attachment_request)
@@ -246,7 +297,7 @@ class NavigationAndDockingNode(Node):
         detachment_request = DetachLink.Request()
         detachment_request.model1_name = 'ebot'
         detachment_request.link1_name = 'ebot_base_link'
-        detachment_request.model2_name = 'rack1'  # Replace with the actual rack name
+        detachment_request.model2_name = f"rack{self.package_id}"  # Replace with the actual rack name
         detachment_request.link2_name = 'link'
 
         detachment_future = self.link_detach_client.call_async(detachment_request)
@@ -263,10 +314,12 @@ class NavigationAndDockingNode(Node):
 
 
 def main(args=None):
+    f = open('config.yaml')
+    config_params = yaml.load(f, Loader=yaml.FullLoader)        
 
     rclpy.init(args=args)
 
-    ebot_nav2_cmd_node = NavigationAndDockingNode()
+    ebot_nav2_cmd_node = NavigationAndDockingNode(config_params)
     
     ebot_nav2_cmd_node.navigate_and_dock()
      

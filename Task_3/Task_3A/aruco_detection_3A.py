@@ -470,7 +470,7 @@ class aruco_tf(Node):
             transform_stamped = TransformStamped()
             transform_stamped.header.stamp = self.get_clock().now().to_msg()
             transform_stamped.header.frame_id = 'camera_link'
-            transform_stamped.child_frame_id = 'cam_{}'.format(marker_id)
+            transform_stamped.child_frame_id = f'1868_cam_{marker_id}'
             transform_stamped.transform.translation.x = float(rotated_cam_frame_vector[0])
             transform_stamped.transform.translation.y = float(rotated_cam_frame_vector[1])
             transform_stamped.transform.translation.z = float(rotated_cam_frame_vector[2])
@@ -483,7 +483,7 @@ class aruco_tf(Node):
             # print(distance_from_rgb)
 
             try:
-                base_to_camera = self.tf_buffer.lookup_transform('base_link', 'cam_{}'.format(marker_id), rclpy.time.Time())
+                base_to_camera = self.tf_buffer.lookup_transform('base_link',f'1868_cam_{marker_id}', rclpy.time.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
            
@@ -494,7 +494,7 @@ class aruco_tf(Node):
             # Publish TF between object frame and base_link
             transform_stamped.header.stamp = self.get_clock().now().to_msg()
             transform_stamped.header.frame_id = 'base_link'
-            transform_stamped.child_frame_id = 'obj_{}'.format(marker_id)
+            transform_stamped.child_frame_id = f'1868_obj_{marker_id}'
             transform_stamped.transform.translation.x = base_to_camera.transform.translation.x
             transform_stamped.transform.translation.y = base_to_camera.transform.translation.y
             transform_stamped.transform.translation.z = base_to_camera.transform.translation.z

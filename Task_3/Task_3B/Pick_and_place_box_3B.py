@@ -37,18 +37,21 @@ from rclpy.time import Time
 import rclpy
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
+import yaml
 
 class TFListener(Node):
-    def __init__(self):
+    def __init__(self,obj_no):
         super().__init__('tf_listener')
+
+        self.obj_no = obj_no
 
         # Initialize TF2 Buffer and TransformListener
         self.tf_buffer = Buffer(Duration(seconds=10.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Lists to store translations and rotations for the 3 boxes
-        self.translations = {"obj_1": None, "obj_3": None, "obj_49": None}
-        self.rotations = {"obj_1": None, "obj_3": None, "obj_49": None}
+        self.translations = {f"obj_{self.obj_no}": None, "obj_3": None, "obj_49": None}
+        self.rotations = {f"obj_{self.obj_no}": None, "obj_3": None, "obj_49": None}
 
         # Create a timer to periodically check for transforms
         self.timer = self.create_timer(1.0, self.lookup_transforms)
@@ -57,17 +60,17 @@ class TFListener(Node):
     def lookup_transforms(self):
         try:
             # Lookup transforms and store them in the lists
-            transform1 = self.tf_buffer.lookup_transform("base_link", "obj_1", Time().to_msg())
+            transform1 = self.tf_buffer.lookup_transform("base_link", f"1868_obj_{self.obj_no}", Time().to_msg())
             # transform3 = self.tf_buffer.lookup_transform("base_link", "obj_3", Time().to_msg())
             # transform49 = self.tf_buffer.lookup_transform("base_link", "obj_49", Time().to_msg())
 
             # Extract and store translations
-            self.translations["obj_1"] = (transform1.transform.translation.x, transform1.transform.translation.y, transform1.transform.translation.z)
+            self.translations[f"obj_{self.obj_no}"] = (transform1.transform.translation.x, transform1.transform.translation.y, transform1.transform.translation.z)
             # self.translations["obj_3"] = (transform3.transform.translation.x, transform3.transform.translation.y, transform3.transform.translation.z)
             # self.translations["obj_49"] = (transform49.transform.translation.x, transform49.transform.translation.y, transform49.transform.translation.z)
 
             # # Extract and store rotations
-            self.rotations["obj_1"] = (transform1.transform.rotation.x, transform1.transform.rotation.y, transform1.transform.rotation.z, transform1.transform.rotation.w)
+            self.rotations[f"obj_{self.obj_no}"] = (transform1.transform.rotation.x, transform1.transform.rotation.y, transform1.transform.rotation.z, transform1.transform.rotation.w)
             # self.rotations["obj_3"] = (transform3.transform.rotation.x, transform3.transform.rotation.y, transform3.transform.rotation.z, transform3.transform.rotation.w)
             # self.rotations["obj_49"] = (transform49.transform.rotation.x, transform49.transform.rotation.y, transform49.transform.rotation.z, transform49.transform.rotation.w)
 
@@ -93,8 +96,10 @@ class TFListener(Node):
 
 class ServoNode(Node):
 
-    def __init__(self, target_poses, target_rotations, target_obj_name):
+    def __init__(self, target_poses, target_rotations, target_obj_name, obj_no):
         super().__init__('servo_node')
+
+        self.obj_no = obj_no
 
         self.move_it_controller = MoveMultipleJointPositions()
 
@@ -299,7 +304,7 @@ class ServoNode(Node):
             self.get_logger().info('AttachLink service not available, waiting...')
 
         req = AttachLink.Request()
-        req.model1_name = f'box{self.ids[int(self.current_target_index/2)]}'  # Specify the box name
+        req.model1_name = 'box3'  # Specify the box name
         req.link1_name = 'link'
         req.model2_name = 'ur5'
         req.link2_name = 'wrist_3_link'
@@ -330,7 +335,7 @@ class ServoNode(Node):
             self.get_logger().info('detachLink service not available, waiting...')
 
         req = DetachLink.Request()
-        req.model1_name = f'box{self.ids[int(self.current_target_index/2)]}'  # Specify the box name
+        req.model1_name = 'box3'  # Specify the box name
         req.link1_name = 'link'
         req.model2_name = 'ur5'
         req.link2_name = 'wrist_3_link'
@@ -431,9 +436,15 @@ class MoveMultipleJointPositions(Node):
 
 
 def main(args=None):
+    # f = open('config.yaml')
+    # config_params = yaml.load(f, Loader=yaml.FullLoader)        
+    # obj_no = int(config_params['package_id'][0])
+
+    obj_no = 1
+
     rclpy.init(args=args)
     
-    tf_listener_node = TFListener()
+    tf_listener_node = TFListener(obj_no)
 
     while not tf_listener_node.first_transform_received:
 
@@ -442,7 +453,7 @@ def main(args=None):
     tf_listener_node.get_logger().info("Tf Listener Node is bieng shut down gg")
    
 
-    for obj_name in ["obj_1"]:
+    for obj_name in [f"obj_{obj_no}"]:
 
         test = list(tf_listener_node.translations[obj_name])
         rot = list(tf_listener_node.rotations[obj_name])
@@ -474,7 +485,7 @@ def main(args=None):
         target_rotations = [tf_listener_node.rotations[obj_name],tf_listener_node.rotations[obj_name]
                         ]
 
-        servo_node = ServoNode(target_poses,target_rotations,obj_name)
+        servo_node = ServoNode(target_poses,target_rotations,obj_name,obj_no)
 
         
         while not servo_node.box_done :
