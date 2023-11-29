@@ -27,6 +27,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 # Stage - 2 : (Selected) 
 ## Task 3 : ( 14th December : Deadline ) 
 
-1. Task 3A : Completed
+1. Task 3A : (Completed)
+   
    Issues to resolve : launching of the 3A script , flickering of rightmost tf marker in hardware camera 
 3. Task 3B : 
