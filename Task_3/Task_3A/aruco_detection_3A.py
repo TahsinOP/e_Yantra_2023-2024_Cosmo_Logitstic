@@ -494,7 +494,7 @@ class aruco_tf(Node):
             # Publish TF between object frame and base_link
             transform_stamped.header.stamp = self.get_clock().now().to_msg()
             transform_stamped.header.frame_id = 'base_link'
-            transform_stamped.child_frame_id = f'1868_obj_{marker_id}'
+            transform_stamped.child_frame_id = f'1868_base_{marker_id}'
             transform_stamped.transform.translation.x = base_to_camera.transform.translation.x
             transform_stamped.transform.translation.y = base_to_camera.transform.translation.y
             transform_stamped.transform.translation.z = base_to_camera.transform.translation.z
