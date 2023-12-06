@@ -29,5 +29,5 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 
 1. Task 3A : (Completed)
    
-   Issues to resolve : launching of the 3A script , flickering of rightmost tf marker in hardware camera 
+   Issues to resolve : launching of the 3A script (solved) , flickering of rightmost tf marker in hardware camera 
 3. Task 3B : 
