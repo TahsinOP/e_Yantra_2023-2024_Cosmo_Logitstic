@@ -170,16 +170,21 @@ def detect_aruco(image):
     rvec_list = []
     tvec_list = []
 
+    # Correction factors 
+    alpha = 5  
+    beta = -200
+    # Contrast and brightness correction for detection in hardware camera ( best values )
 
-  
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    adjusted_image = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
   
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     parameters =  cv2.aruco.DetectorParameters()
     
     # Detect Aruco markers in the image and store 'corners' and 'ids'
-    corners, marker_ids, _ = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+    corners, marker_ids, _ = cv2.aruco.detectMarkers(adjusted_image, aruco_dict, parameters=parameters)
     print(f"Marker id is {marker_ids}")
 
     # Loop over each detected marker
