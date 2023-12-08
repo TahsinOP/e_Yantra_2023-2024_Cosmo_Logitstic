@@ -249,7 +249,7 @@ class aruco_tf(Node):
 
         ############ Constructor VARIABLES/OBJECTS ############
 
-        image_processing_rate = 0.4                                                    # rate of time to process image (seconds)
+        image_processing_rate = 1                                                 # rate of time to process image (seconds)
         self.bridge = CvBridge()                                                        # initialise CvBridge object for image conversion
         self.tf_buffer = tf2_ros.buffer.Buffer()                                        # buffer time used for listening transforms
         self.listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -258,6 +258,7 @@ class aruco_tf(Node):
         
         self.cv_image = None                                                           # colour raw image variable (from colorimagecb())
         self.depth_image = None                                                         # depth image variable (from depthimagecb())
+
 
 
     def depthimagecb(self, data):
@@ -311,6 +312,7 @@ class aruco_tf(Node):
         ############################################
         try:
             self.cv_image = self.bridge.imgmsg_to_cv2(data, desired_encoding="bgr8")
+
         except CvBridgeError as e:
             self.get_logger().error("Error converting color image: %s" % str(e))
             return
@@ -494,7 +496,7 @@ class aruco_tf(Node):
             # Publish TF between object frame and base_link
             transform_stamped.header.stamp = self.get_clock().now().to_msg()
             transform_stamped.header.frame_id = 'base_link'
-            transform_stamped.child_frame_id = f'1868_base_{marker_id}'
+            transform_stamped.child_frame_id = f'1868_obj_{marker_id}'
             transform_stamped.transform.translation.x = base_to_camera.transform.translation.x
             transform_stamped.transform.translation.y = base_to_camera.transform.translation.y
             transform_stamped.transform.translation.z = base_to_camera.transform.translation.z
@@ -522,27 +524,41 @@ def main():
     '''
     Description:    Main function which creates a ROS node and spin around for the aruco_tf class to perform it's task
     '''
+    # rclpy.init(args=sys.argv)                                       # initialisation
+
+    # node = rclpy.create_node('aruco_tf_process')                    # creating ROS node
+
+    # node.get_logger().info('Node created: Aruco tf process')       # logging information
+
+    # aruco_tf_class = aruco_tf()                                     # creating a new object for class 'aruco_tf'
+    # try:
+    #     rate = aruco_tf_class.create_rate(1)
+    #     rclpy.spin(aruco_tf_class)                                  # spining on the object to make it alive in ROS 2 DDS
+        
+    #     while rclpy.ok:
+    #         rate.sleep()
+    # except KeyboardInterrupt:
+    #     pass
+    #                                     # spining on the object to make it alive in ROS 2 DDS
+
+    # aruco_tf_class.destroy_node()                                   # destroy node after spin ends
+
+    # rclpy.shutdown()                                                # shutdown process
+
+    
     rclpy.init(args=sys.argv)                                       # initialisation
 
     node = rclpy.create_node('aruco_tf_process')                    # creating ROS node
 
-    node.get_logger().info('Node created: Aruco tf process')       # logging information
+    node.get_logger().info('Node created: Aruco tf process')        # logging information
 
     aruco_tf_class = aruco_tf()                                     # creating a new object for class 'aruco_tf'
-    try:
-        rate = aruco_tf_class.create_rate(1)
-        rclpy.spin(aruco_tf_class)                                  # spining on the object to make it alive in ROS 2 DDS
-        
-        while rclpy.ok:
-            rate.sleep()
-    except KeyboardInterrupt:
-        pass
-                                        # spining on the object to make it alive in ROS 2 DDS
+
+    rclpy.spin(aruco_tf_class)                                      # spining on the object to make it alive in ROS 2 DDS
 
     aruco_tf_class.destroy_node()                                   # destroy node after spin ends
 
-    rclpy.shutdown()                                                # shutdown process
-
+    rclpy.shutdown()    
 
 if __name__ == '__main__':
     '''
