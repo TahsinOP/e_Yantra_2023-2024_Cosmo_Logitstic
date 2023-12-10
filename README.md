@@ -29,7 +29,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 
 1. Task 3A : (Completed)
    Issues resolved 
-   1. launching of the 3A script (solved) 
+   1. launching of the 3A script (solved : Increased the image processing rate ) 
    2. flickering of rightmost tf marker in hardware camera ( solved : used alpha and beta factors )
 
 ![Screenshot from 2023-12-08 14-22-55](https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/e557d9ea-713e-436e-85cb-b394cb4cbd4a)
