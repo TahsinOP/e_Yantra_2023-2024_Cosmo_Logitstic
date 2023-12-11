@@ -123,6 +123,8 @@ class NavigationAndDockingNode(Node):
 
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation to the home pose succeeded.')
+
+            
             
         else:
             self.get_logger().error('Navigation to the home pose failed.')
@@ -147,8 +149,8 @@ class NavigationAndDockingNode(Node):
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.8 # Replace with your desired X coordinate
-        goal_pose.pose.position.y = -2.455  # Replace with your desired Y coordinate
+        goal_pose.pose.position.x = 0.9 # Replace with your desired X coordinate
+        goal_pose.pose.position.y = -2.4  # Replace with your desired Y coordinate
 
         # goal_pose.pose.orientation = Quaternion(z= 3.14, w=1.0)
         goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
@@ -256,7 +258,7 @@ class NavigationAndDockingNode(Node):
         if future.result() is not None:
             self.get_logger().info("Docking service succeeded. Waiting for robot to come to rest.")
 
-            while not ((self.vel_x < 0.1) and (self.ang_z < 0.1) and (self.normalize_angle(self.robot_pose[2])>3.12)):
+            while not ((self.vel_x < 0.1) and (self.ang_z < 0.1) and (self.normalize_angle(self.robot_pose[2])>3.09)):
                
                rclpy.spin_once(self)
                

@@ -436,11 +436,10 @@ class MoveMultipleJointPositions(Node):
 
 
 def main(args=None):
-    # f = open('config.yaml')
-    # config_params = yaml.load(f, Loader=yaml.FullLoader)        
-    # obj_no = int(config_params['package_id'][0])
 
-    obj_no = 1
+    f = open('config.yaml')
+    config_params = yaml.load(f, Loader=yaml.FullLoader)        
+    obj_no = int(config_params['package_id'][0])
 
     rclpy.init(args=args)
     
