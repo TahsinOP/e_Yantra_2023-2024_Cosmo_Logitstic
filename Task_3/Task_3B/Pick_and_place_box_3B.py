@@ -9,34 +9,25 @@
 #!/usr/bin/env python3
 
 from scipy.spatial.transform import Rotation as R
-from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
-from tf2_ros import TransformException
-from linkattacher_msgs.srv import AttachLink
-from linkattacher_msgs.srv import DetachLink
+from tf2_ros import LookupException, ConnectivityException, ExtrapolationException, TransformException, Buffer, TransformListener
+from linkattacher_msgs.srv import AttachLink, DetachLink
+
 from std_srvs.srv import Trigger 
+
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.duration import Duration
 from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.time import Time
 from rclpy.node import Node
+
 from geometry_msgs.msg import TwistStamped
-from pymoveit2.robots import ur5
-import math
-from threading import Thread
-import rclpy
-from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.node import Node
+
 from pymoveit2 import MoveIt2
 from pymoveit2.robots import ur5
-from tf2_ros import TransformListener
-from tf2_ros import TransformException
-from rclpy.node import Node
-import rclpy
+
+import math
 from threading import Thread
-from rclpy.time import Time
-import rclpy
-from rclpy.node import Node
-from tf2_ros import Buffer, TransformListener
 import yaml
 
 class TFListener(Node):
@@ -61,18 +52,13 @@ class TFListener(Node):
         try:
             # Lookup transforms and store them in the lists
             transform1 = self.tf_buffer.lookup_transform("base_link", f"1868_obj_{self.obj_no}", Time().to_msg())
-            # transform3 = self.tf_buffer.lookup_transform("base_link", "obj_3", Time().to_msg())
-            # transform49 = self.tf_buffer.lookup_transform("base_link", "obj_49", Time().to_msg())
 
             # Extract and store translations
             self.translations[f"obj_{self.obj_no}"] = (transform1.transform.translation.x, transform1.transform.translation.y, transform1.transform.translation.z)
-            # self.translations["obj_3"] = (transform3.transform.translation.x, transform3.transform.translation.y, transform3.transform.translation.z)
-            # self.translations["obj_49"] = (transform49.transform.translation.x, transform49.transform.translation.y, transform49.transform.translation.z)
 
             # # Extract and store rotations
             self.rotations[f"obj_{self.obj_no}"] = (transform1.transform.rotation.x, transform1.transform.rotation.y, transform1.transform.rotation.z, transform1.transform.rotation.w)
-            # self.rotations["obj_3"] = (transform3.transform.rotation.x, transform3.transform.rotation.y, transform3.transform.rotation.z, transform3.transform.rotation.w)
-            # self.rotations["obj_49"] = (transform49.transform.rotation.x, transform49.transform.rotation.y, transform49.transform.rotation.z, transform49.transform.rotation.w)
+            
 
             # Print or process the transforms as needed
             self.print_transforms()
@@ -90,6 +76,7 @@ class TFListener(Node):
     def print_transforms(self):
         # Print or process the stored transforms
         for obj_id in self.translations:
+
             self.get_logger().info(f"Transform for {obj_id}:")
             self.get_logger().info(f"Translation: {self.translations[obj_id]}")
             self.get_logger().info(f"Rotation: {self.rotations[obj_id]}")
@@ -101,12 +88,7 @@ class ServoNode(Node):
 
         self.obj_no = obj_no
 
-        self.move_it_controller = MoveMultipleJointPositions()
-
-        # Create callback group that allows execution of callbacks in parallel without restrictions
-        callback_group = ReentrantCallbackGroup()
-        self.attached = False
-                                       
+        self.move_it_controller = MoveMultipleJointPositions()                                 
         self.tf_buffer = Buffer(Duration(seconds=10.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -118,16 +100,16 @@ class ServoNode(Node):
         self.target_rotations = target_rotations
 
         self.start_servo_service()
+
         print(f"target pose is {self.target_poses}")
 
         self.current_target_index = 0
+
         self.ids = [int(target_obj_name.split('_')[1])]
         
         self.distance_threshold = 0.01
 
         self.box_done = False
-
-        self.attaching = False
 
         self.cons = (math.pi)/180
 
@@ -143,7 +125,7 @@ class ServoNode(Node):
         self.home_pose = [
             0.0, -137 * (math.pi / 180), 138* (math.pi / 180),
             -180 * (math.pi / 180), -90 * (math.pi / 180), 180 * (math.pi / 180)]
-        self.start_servo_service()
+        
         
         self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
         
@@ -238,8 +220,7 @@ class ServoNode(Node):
                     trans.transform.translation.y,
                     trans.transform.translation.z
                 ]
-                 
-                
+                   
                 diff = [target_pose[i] - current_pose[i] for i in range(3)]
 
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
@@ -249,11 +230,9 @@ class ServoNode(Node):
 
                     self.attach_link_service()
                     
-
                     if (self.current_target_index%2) == 1 :
-
-                        
-                        self.test_function()                     
+     
+                        self.move_to_post_pick_pose()                     
 
                         self.detach_link_service()
 
@@ -268,12 +247,10 @@ class ServoNode(Node):
                             self.timer.reset()
 
                             print("timer has been shut down")           
-
                        
                     self.current_target_index += 1
 
                     print(f"Current taget index increased{self.current_target_index}")
-
                     
                 else:
                     scaling_factor = 0.8
@@ -287,24 +264,20 @@ class ServoNode(Node):
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
 
-    def test_function(self):
+    def move_to_post_pick_pose(self):
 
         self.move_it_controller.move_to_home_and_drop_pose_after_servoing()
 
 
-
     def attach_link_service(self):
 
-       
-        # print('timer has been cancelled')
-        # Create a client for the AttachLink service
         attach_link_client = self.create_client(AttachLink, '/GripperMagnetON')
 
         while not attach_link_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('AttachLink service not available, waiting...')
 
         req = AttachLink.Request()
-        req.model1_name = 'box3'  # Specify the box name
+        req.model1_name = f"box{self.obj_no}"  # Specify the box name
         req.link1_name = 'link'
         req.model2_name = 'ur5'
         req.link2_name = 'wrist_3_link'
@@ -315,12 +288,9 @@ class ServoNode(Node):
         if future.result() is not None:
 
             if future.result().success:
-
-               
+    
                 self.get_logger().info("Attachment successful.")
-                self.attached = True
-                self.attaching = False   
-
+              
             else:
                 self.get_logger().error("Attachment failed: %s", future.result().message)
         else:
@@ -335,7 +305,7 @@ class ServoNode(Node):
             self.get_logger().info('detachLink service not available, waiting...')
 
         req = DetachLink.Request()
-        req.model1_name = 'box3'  # Specify the box name
+        req.model1_name = f"box{self.obj_no}"  # Specify the box name
         req.link1_name = 'link'
         req.model2_name = 'ur5'
         req.link2_name = 'wrist_3_link'
@@ -439,20 +409,23 @@ def main(args=None):
 
     f = open('config.yaml')
     config_params = yaml.load(f, Loader=yaml.FullLoader)        
-    obj_no = int(config_params['package_id'][0])
+    # obj_no = int(config_params['package_id'][0])
 
     rclpy.init(args=args)
-    
-    tf_listener_node = TFListener(obj_no)
 
-    while not tf_listener_node.first_transform_received:
+    for obj_no in [int(package_id) for package_id in config_params['package_id']]:
+        tf_listener_node = TFListener(obj_no)
 
-        rclpy.spin_once(tf_listener_node, timeout_sec=1.0)
-    
-    tf_listener_node.get_logger().info("Tf Listener Node is bieng shut down gg")
+        while not tf_listener_node.first_transform_received:
+
+            rclpy.spin_once(tf_listener_node, timeout_sec=1.0)
+        
+        tf_listener_node.get_logger().info("Tf Listener Node has received the transforms")
+
+        obj_name = f"obj_{obj_no}"
    
 
-    for obj_name in [f"obj_{obj_no}"]:
+    # for obj_name in [f"obj_{obj_no}"]:
 
         test = list(tf_listener_node.translations[obj_name])
         rot = list(tf_listener_node.rotations[obj_name])
@@ -476,8 +449,6 @@ def main(args=None):
         elif abs(yaw - math.pi) < error:
             test[1] -= 0.18     #Right hand side while facing the racks
             
-        
-        drop_pose = [-0.47, 0.12, 0.397]
 
         target_poses = [tf_listener_node.translations[obj_name],test
                     ]
@@ -495,7 +466,7 @@ def main(args=None):
         
         servo_node.destroy_node() 
 
-    print('gggs')
+    print('Pick and place operation completed')
 
 
     rclpy.shutdown()
