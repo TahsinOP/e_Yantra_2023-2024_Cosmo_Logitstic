@@ -189,8 +189,6 @@ class NavigationAndDockingNode(Node):
             self.get_logger().error("Docking service failed.")
 
     def trigger_docking_service_final(self):
-       
-               
         self.get_logger().info("Triggering the docking service ")
         dock_control_request = DockSw.Request()
         dock_control_request.linear_dock = True# Enable linear correction

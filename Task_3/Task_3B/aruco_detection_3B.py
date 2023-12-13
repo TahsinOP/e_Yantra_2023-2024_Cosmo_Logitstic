@@ -61,7 +61,7 @@ def calculate_rectangle_area(coordinates):
         area        (float):    area of detected aruco
         width       (float):    width of detected aruco
     '''
-     # Check if there are exactly 4 coordinates
+    # Check if there are exactly 4 coordinates
     if len(coordinates) != 4:
         raise ValueError("Coordinates should contain exactly 4 sets of (x, y) coordinates.")
 
@@ -134,7 +134,6 @@ def detect_aruco(image):
     # We are using 150x150 aruco marker size
     size_of_aruco_m = 0.15
 
- 
     ############ ADD YOUR CODE HERE ############
 
     # INSTRUCTIONS & HELP : 
@@ -392,20 +391,11 @@ class aruco_tf(Node):
 
         ############################################
 
-
-       
-             
-             
-
         
         
         
         
         center_aruco_list, distance_from_rgb_list, angle_aruco_list, ids, rvec_list, tvec_list = detect_aruco(self.cv_image)
-
-
-      
-     
         
 
         
@@ -447,12 +437,12 @@ class aruco_tf(Node):
             angle_z_rad = -(math.pi)/2
 
             rotation_matrix_y = np.array([[np.cos(angle_y_rad), 0, np.sin(angle_y_rad)],
-                              [0, 1, 0],
-                              [-np.sin(angle_y_rad), 0, np.cos(angle_y_rad)]])
+                            [0, 1, 0],
+                            [-np.sin(angle_y_rad), 0, np.cos(angle_y_rad)]])
             
             rotation_matrix_z = np.array([[np.cos(angle_z_rad), -np.sin(angle_z_rad), 0],
-                              [np.sin(angle_z_rad), np.cos(angle_z_rad), 0],
-                              [0, 0, 1]])
+                            [np.sin(angle_z_rad), np.cos(angle_z_rad), 0],
+                            [0, 0, 1]])
             
 
             rvec = rvec_list[i]
@@ -460,7 +450,6 @@ class aruco_tf(Node):
 
             rotation_matrix_from_rvec = R.from_rotvec(rvec.reshape(3,))
             rotation_matrix_from_rvec = rotation_matrix_from_rvec.as_matrix()
-           
             final_vector = np.dot(rotation_matrix_from_rvec,marker_frame_vec)
             cam_frame_vector = tvec + final_vector
             cam_frame_vector = cam_frame_vector.reshape(-1, 1)
@@ -490,7 +479,6 @@ class aruco_tf(Node):
                 base_to_camera = self.tf_buffer.lookup_transform('base_link',f'1868_cam_{marker_id}', rclpy.time.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
-           
 
             # print(transform_stamped.transform.rotation)
             print(base_to_camera.transform.rotation)
@@ -508,7 +496,6 @@ class aruco_tf(Node):
             transform_stamped.transform.rotation.z = base_to_camera.transform.rotation.z
             self.br.sendTransform(transform_stamped)
         
-       
 
         
 
@@ -517,7 +504,6 @@ class aruco_tf(Node):
         cv2.imshow('Aruco Markers', self.cv_image)
         cv2.waitKey(10)  # Adjust the delay as needed
 
-      
 
 
 ##################### FUNCTION DEFINITION #######################

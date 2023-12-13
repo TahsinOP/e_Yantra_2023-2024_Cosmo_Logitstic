@@ -41,8 +41,8 @@ class TFListener(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Lists to store translations and rotations for the 3 boxes
-        self.translations = {f"obj_{self.obj_no}": None, "obj_3": None, "obj_49": None}
-        self.rotations = {f"obj_{self.obj_no}": None, "obj_3": None, "obj_49": None}
+        self.translations = {f"obj_{self.obj_no}": None}
+        self.rotations = {f"obj_{self.obj_no}": None}
 
         # Create a timer to periodically check for transforms
         self.timer = self.create_timer(1.0, self.lookup_transforms)
@@ -81,12 +81,31 @@ class TFListener(Node):
             self.get_logger().info(f"Translation: {self.translations[obj_id]}")
             self.get_logger().info(f"Rotation: {self.rotations[obj_id]}")
 
-class ServoNode(Node):
+    def get_transform(self,obj_name):
+        return self.translations[obj_name]
+    
+    def get_rotation(self,obj_name):
+        return self.rotations[obj_name]
 
-    def __init__(self, target_poses, target_rotations, target_obj_name, obj_no):
+class ServoNode(Node):
+    def __init__(self, target_poses, target_rotations, obj_no):
         super().__init__('servo_node')
 
+        self.target_poses = target_poses
+        self.target_rotations = target_rotations
         self.obj_no = obj_no
+        self.ids = [obj_no]
+
+        self.distance_threshold = 0.01
+        self.error = 0.05
+        self.current_target_index = 0
+        self.box_done = False
+
+        #Convert degree to radians
+        cons = (math.pi)/180
+        self.yaw_right_box_pose = [joint_angle*cons for joint_angle in [-90, -137 , 138 , -180 , -90 , 180 ]] 
+        self.yaw_left_box_pose = [joint_angle*cons for joint_angle in [90, -137 , 138 , -180 , -90 , 180 ]] 
+        self.home_pose = [joint_angle*cons for joint_angle in [0.0, -137 , 138 , -180 , -90 , 180 ]] 
 
         self.move_it_controller = MoveMultipleJointPositions()                                 
         self.tf_buffer = Buffer(Duration(seconds=10.0))
@@ -96,37 +115,8 @@ class ServoNode(Node):
 
         self.twist_pub = self.create_publisher(TwistStamped, "/servo_node/delta_twist_cmds", 10)
 
-        self.target_poses = target_poses
-        self.target_rotations = target_rotations
-
         self.start_servo_service()
 
-        print(f"target pose is {self.target_poses}")
-
-        self.current_target_index = 0
-
-        self.ids = [int(target_obj_name.split('_')[1])]
-        
-        self.distance_threshold = 0.01
-
-        self.box_done = False
-
-        self.cons = (math.pi)/180
-
-        self.yaw_right_box_pose = [
-            -90*(math.pi/180), -137 * (math.pi / 180), 138 * (math.pi / 180),
-            -180 * (math.pi / 180), -90 * (math.pi / 180), 180 * (math.pi / 180)]
-
-        self.yaw_left_box_pose = [
-            90*(math.pi/180), -137 * (math.pi / 180), 138 * (math.pi / 180),
-            -180 * (math.pi / 180), -90 * (math.pi / 180), 180 * (math.pi / 180)
-        ]
-
-        self.home_pose = [
-            0.0, -137 * (math.pi / 180), 138* (math.pi / 180),
-            -180 * (math.pi / 180), -90 * (math.pi / 180), 180 * (math.pi / 180)]
-        
-        
         self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
         
     def start_servo_service(self):
@@ -182,7 +172,7 @@ class ServoNode(Node):
             else:
                 self.get_logger().error("Service call failed. Unable to stop Servo controller.")
 
- 
+
     def servo_to_target(self):
         
         if self.current_target_index < len(self.target_poses):
@@ -193,8 +183,15 @@ class ServoNode(Node):
                 target_rotation = self.target_rotations[self.current_target_index]
 
                 current_orientation = [ trans.transform.rotation.x,
-                        trans.transform.rotation.y,
-                        trans.transform.rotation.z, trans.transform.rotation.w]
+                                        trans.transform.rotation.y,
+                                        trans.transform.rotation.z,
+                                        trans.transform.rotation.w]
+                
+                current_translation = [
+                    trans.transform.translation.x,
+                    trans.transform.translation.y,
+                    trans.transform.translation.z
+                ]
                 
                 target_rot_euler = list(R.from_quat(target_rotation).as_euler('xyz'))
                 current_orientation_euler = list(R.from_quat(current_orientation).as_euler('xyz'))
@@ -204,70 +201,46 @@ class ServoNode(Node):
                 while yaw < -math.pi:
                     yaw += 2*math.pi
 
-                error = 0.05
-
-                if abs(yaw - math.pi/2) < error:
-                    
+                #To position accordingly for left and right side boxes
+                if abs(yaw - math.pi/2) < self.error:
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
-
-                elif abs(yaw - -math.pi/2) < error:
-
+                elif abs(yaw - -math.pi/2) < self.error:
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
-                               
-                
-                current_pose = [
-                    trans.transform.translation.x,
-                    trans.transform.translation.y,
-                    trans.transform.translation.z
-                ]
-                   
-                diff = [target_pose[i] - current_pose[i] for i in range(3)]
+
+
+                diff = [target_pose[i] - current_translation[i] for i in range(3)]
 
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
 
                 if distance < self.distance_threshold:
-                    self.attaching = True
-
                     self.attach_link_service()
                     
                     if (self.current_target_index%2) == 1 :
-     
-                        self.move_to_post_pick_pose()                     
-
+                        #To move to post pick position
+                        self.move_to_post_pick_pose()                    
                         self.detach_link_service()
-
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
-
                         self.box_done = True
-
-                        print ( self.box_done) 
-
                         if (self.box_done):
+                            self.timer.reset()       
 
-                            self.timer.reset()
-
-                            print("timer has been shut down")           
-                       
                     self.current_target_index += 1
-
-                    print(f"Current taget index increased{self.current_target_index}")
                     
                 else:
                     scaling_factor = 0.8
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
-                    for i in range(3):
-                        twist_msg.twist.linear.x = diff[0] * scaling_factor
-                        twist_msg.twist.linear.y = diff[1] * scaling_factor
-                        twist_msg.twist.linear.z = diff[2] * scaling_factor
+                    twist_msg.twist.linear.x = diff[0] * scaling_factor
+                    twist_msg.twist.linear.y = diff[1] * scaling_factor
+                    twist_msg.twist.linear.z = diff[2] * scaling_factor
                     self.twist_pub.publish(twist_msg)
+
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
 
     def move_to_post_pick_pose(self):
 
         self.move_it_controller.move_to_home_and_drop_pose_after_servoing()
-
 
     def attach_link_service(self):
 
@@ -286,17 +259,11 @@ class ServoNode(Node):
         future = attach_link_client.call_async(req)
 
         if future.result() is not None:
-
             if future.result().success:
-    
                 self.get_logger().info("Attachment successful.")
-              
             else:
                 self.get_logger().error("Attachment failed: %s", future.result().message)
-        else:
-            self.get_logger().info("gg")
 
-        
     def detach_link_service(self):
 
         detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
@@ -314,25 +281,16 @@ class ServoNode(Node):
         future = detach_link_client.call_async(req)    
 
         if future.result() is not None:
-
             if future.result().success:
-
-                 
                 self.get_logger().info("detachment successful.")
                 self.detached = True
-                     
-
             else:
                 self.get_logger().error("detachment failed: %s", future.result().message)
-        else:
-            self.get_logger().info("gg")
-       
-        
+
 class MoveMultipleJointPositions(Node):
 
     def __init__(self):
         super().__init__('move_multiple_joint_positions')
-        self.cons = math.pi / 180
         self.moveit2 = None
         self.detached = False
         self.movit_done = False
@@ -378,32 +336,18 @@ class MoveMultipleJointPositions(Node):
             group_name=ur5.MOVE_GROUP_ARM,
             callback_group=ReentrantCallbackGroup()
         )
-       
 
         executor = MultiThreadedExecutor(1)
         executor.add_node(self)
         executor = Thread(target= executor.spin, daemon=True, args=())
         executor.start()
         
-
-        joint_positions_1 = [
-            0.0,
-            -169 * self.cons,
-            52 * self.cons,
-            -241 * self.cons,
-            -90 * self.cons,
-            180 * self.cons
-        ]
-
-        joint_positions_2 = [
-            0.0, -137 * (math.pi / 180), 138 * (math.pi / 180),
-            -180 * (math.pi / 180), -90 * (math.pi / 180), 180 * (math.pi / 180)
-        ]
+        cons = (math.pi)/180
+        joint_positions_1 = [joint_angle*cons for joint_angle in [0.0,-169,52,-241,-90,180]]
+        joint_positions_2 = [joint_angle*cons for joint_angle in [0.0, -137 , 138 ,-180 , -90 , 180]]
 
         # Move to multiple joint configurations
         self.move_to_multiple_joint_positions(joint_positions_2, joint_positions_1)
-
-
 
 def main(args=None):
 
@@ -423,46 +367,41 @@ def main(args=None):
         tf_listener_node.get_logger().info("Tf Listener Node has received the transforms")
 
         obj_name = f"obj_{obj_no}"
-   
 
-    # for obj_name in [f"obj_{obj_no}"]:
+        post_pick = list(tf_listener_node.get_transform(obj_name))
 
-        test = list(tf_listener_node.translations[obj_name])
-        rot = list(tf_listener_node.rotations[obj_name])
-
+        rot = list(tf_listener_node.get_rotation(obj_name))
         target_rot_euler = list(R.from_quat(rot).as_euler('xyz'))
 
+        
         yaw = target_rot_euler[2]
 
-        print(yaw)
-
+        #We have to bring the yaw in range
         while yaw < -math.pi:
             yaw += 2*math.pi
 
         error = 0.05
 
+        #We have to account for the different orientations of the boxes
         if abs(yaw - math.pi/2) < error:
-            test[0] -= 0.18
-
+            post_pick[0] -= 0.18
         elif abs(yaw - 0) < error:
-            test[1] += 0.18
+            post_pick[1] += 0.18
         elif abs(yaw - math.pi) < error:
-            test[1] -= 0.18     #Right hand side while facing the racks
+            post_pick[1] -= 0.18     #Right hand side while facing the racks
             
 
-        target_poses = [tf_listener_node.translations[obj_name],test
-                    ]
-        target_rotations = [tf_listener_node.rotations[obj_name],tf_listener_node.rotations[obj_name]
-                        ]
+        target_poses = [tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
+        target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(2)]
 
-        servo_node = ServoNode(target_poses,target_rotations,obj_name,obj_no)
+        servo_node = ServoNode(target_poses,target_rotations,obj_no)
 
         
         while not servo_node.box_done :
 
             rclpy.spin_once(servo_node,timeout_sec=0.02)
 
-        servo_node.get_logger().info("servo Node is bieng shut down gg")
+        servo_node.get_logger().info("Shutting down Servo Node")
         
         servo_node.destroy_node() 
 
