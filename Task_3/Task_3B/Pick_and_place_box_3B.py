@@ -29,6 +29,7 @@ from pymoveit2.robots import ur5
 import math
 from threading import Thread
 import yaml
+import os
 
 class TFListener(Node):
     def __init__(self,obj_no):
@@ -350,10 +351,13 @@ class MoveMultipleJointPositions(Node):
         self.move_to_multiple_joint_positions(joint_positions_2, joint_positions_1)
 
 def main(args=None):
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    f = open('config.yaml')
-    config_params = yaml.load(f, Loader=yaml.FullLoader)        
-    # obj_no = int(config_params['package_id'][0])
+    yaml_file_path = os.path.join(script_dir, 'config.yaml')
+
+    with open(yaml_file_path, 'r') as file:
+        config_params = yaml.safe_load(file)
 
     rclpy.init(args=args)
 

@@ -15,7 +15,6 @@ from scipy.spatial.transform import Rotation as R
 from linkattacher_msgs.srv import AttachLink, DetachLink  
 import math
 import yaml
-import os
 
 # Team ID:          CL#1868
 
@@ -42,7 +41,7 @@ class NavigationAndDockingNode(Node):
         self.docked = False                 # Flag to determine if docking is completed or not 
         self.target_angle_rack_3  = 3.14
         self.target_angle_rack_1 = -3.14
-        self.dock_service_error = 0.07
+        self.dock_service_error = 0.02
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
@@ -63,8 +62,8 @@ class NavigationAndDockingNode(Node):
         self.rack_pose_y = self.rack_info[1]
         self.rack_orientation = self.rack_info[2]
 
-        self.get_logger().info(f"The package id is {self.package_id}")
-        self.get_logger().info(f"The required rack information is {self.rack_info}")
+        print(f"The package id is {self.package_id}")
+        print(f"The required rack information is {self.rack_info}")
 
     def docking_error_control_loop(self):
 
@@ -108,7 +107,7 @@ class NavigationAndDockingNode(Node):
 
     def navigate_to_home_pose(self):
         # Define the goal pose for the subsequent navigation
-        pose_euler = [0.0,0.0,0.0]
+        pose_euler = [0.0 for _ in range(3)]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
 
@@ -149,8 +148,8 @@ class NavigationAndDockingNode(Node):
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.85    # Co-ordinates of the arm pose 
-        goal_pose.pose.position.y = -2.3 
+        goal_pose.pose.position.x = 0.9    # Co-ordinates of the arm pose 
+        goal_pose.pose.position.y = -2.4 
 
         goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
         goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
@@ -292,12 +291,8 @@ class NavigationAndDockingNode(Node):
             self.get_logger().error("Attachment service failed.")
 
 def main(args=None):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    yaml_file_path = os.path.join(script_dir, 'config.yaml')
-
-    with open(yaml_file_path, 'r') as file:
-        config_params = yaml.safe_load(file)        
+    f = open('config.yaml')                                # Reads the given data in the config.yaml file
+    config_params = yaml.load(f, Loader=yaml.FullLoader)        
 
     rclpy.init(args=args)
 
