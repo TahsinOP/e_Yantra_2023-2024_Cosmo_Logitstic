@@ -36,5 +36,14 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 ![Screenshot from 2023-12-08 14-22-55](https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/e557d9ea-713e-436e-85cb-b394cb4cbd4a)
 
    
-2. Task 3B : 
+2. Task 3B : (Completed) 
+
+    Created a custom ROS2 python launch file to launch all the python scripts in the below order :
+   
+     i. Launch 'ebot_docking_service_task3b.py' and 'ebot_nav2_cmd_task3b.py' simultaneously
+     ii. Launch 'aruco_detection_3B' as soon as 'ebot_nav2_cmd_task3b.py' exits 
+     iii. Launch the 'Pick_and_place_box_3B.py' with a delay timer (5secs) after the 3rd script starts
+
+
+https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/a50750c0-593b-4c77-90c6-3d2d47225154
 
