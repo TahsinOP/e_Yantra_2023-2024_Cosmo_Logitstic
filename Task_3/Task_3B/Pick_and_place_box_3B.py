@@ -388,11 +388,11 @@ def main(args=None):
 
         #We have to account for the different orientations of the boxes
         if abs(yaw - math.pi/2) < error:
-            post_pick[0] -= 0.18
+            post_pick[0] -= 0.19
         elif abs(yaw - 0) < error:
-            post_pick[1] += 0.18
+            post_pick[1] += 0.19
         elif abs(yaw - math.pi) < error:
-            post_pick[1] -= 0.18     #Right hand side while facing the racks
+            post_pick[1] -= 0.19   #Right hand side while facing the racks
             
 
         target_poses = [tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
