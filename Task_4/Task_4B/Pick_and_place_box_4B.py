@@ -10,10 +10,10 @@
 
 from scipy.spatial.transform import Rotation as R
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException, TransformException, Buffer, TransformListener
-# from linkattacher_msgs.srv import AttachLink, DetachLink
-from ur_msgs.srv import SetIO
 
+from ur_msgs.srv import SetIO
 from std_srvs.srv import Trigger 
+from controller_manager_msgs.srv import SwitchController
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
@@ -136,6 +136,7 @@ class ServoNode(Node):
         callback_group = ReentrantCallbackGroup()
 
         self.twist_pub = self.create_publisher(TwistStamped, "/servo_node/delta_twist_cmds", 10)
+        self.__contolMSwitch = self.create_client(SwitchController, "/controller_manager/switch_controller")
 
         self.start_servo_service()
 
@@ -226,8 +227,10 @@ class ServoNode(Node):
                 #To position accordingly for left and right side boxes
                 if abs(yaw - math.pi/2) < self.error:
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
+                    self.switch_controller(2)                     # Switch from move_it controller to servo 
                 elif abs(yaw - -math.pi/2) < self.error:
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
+                    self.switch_controller(2)                      # Switch from move_it controller to servo 
 
 
                 diff = [target_pose[i] - current_translation[i] for i in range(3)]
@@ -240,6 +243,7 @@ class ServoNode(Node):
 
                     if (self.current_target_index%2) == 1 :
                         #To move to post pick position
+                        self.switch_controller(1)         # Switch from servo to move_it controller in hardware
                         self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
                         self.gripper_call(False)
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
@@ -261,10 +265,6 @@ class ServoNode(Node):
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
 
-    def move_to_post_pick_pose(self):
-
-        self.move_it_controller.move_to_home_and_drop_pose_after_servoing()
-
     def gripper_call(self, state):  
 
         # Function to call the attach/detach function in UR5 hardware in Task4B
@@ -278,7 +278,29 @@ class ServoNode(Node):
         req.state   = float(state)
         gripper_control.call_async(req)
         return state
+    
+    def switch_controller(self,control):
 
+        if control == 1 :  # servo to Move_it 
+            activate_controllers_param = ["scaled_joint_trajectory_controller"]
+            deactivate_controllers_param = ["forward_position_controller"]
+
+        elif control == 2 : # Move_it to Servo 
+            activate_controllers_param = ["forward_position_controller"]
+            deactivate_controllers_param = ["scaled_joint_trajectory_controller"]
+
+
+        switchParam = SwitchController.Request()
+        switchParam.activate_controllers = activate_controllers_param # for normal use of moveit
+        switchParam.deactivate_controllers = deactivate_controllers_param # for servoing
+        switchParam.strictness = 2
+        switchParam.start_asap = False
+
+        # calling control manager service after checking its availability
+        while not self.__contolMSwitch.wait_for_service(timeout_sec=5.0):
+            self.get_logger().warn(f"Service control Manager is not yet available...")
+        self.__contolMSwitch.call_async(switchParam)
+        print("[CM]: Switching Complete")
 
 class MoveMultipleJointPositions(Node):
 
