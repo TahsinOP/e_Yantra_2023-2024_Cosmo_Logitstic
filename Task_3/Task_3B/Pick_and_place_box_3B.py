@@ -48,7 +48,7 @@ class TFListener(Node):
         # Create a timer to periodically check for transforms
         self.timer = self.create_timer(1.0, self.lookup_transforms)
         self.first_transform_received = False  # Flag to track the first transform
-      
+
     def lookup_transforms(self):
         try:
             # Lookup transforms and store them in the lists
@@ -164,9 +164,7 @@ class ServoNode(Node):
             if future.result() is not None:
 
                 if future.result().success:
-                    self.get_logger().info("Servo controller stopped successfully.")
-                      
-                    self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
+                    self.get_logger().info("Servo controller stopped successfully.")               
 
                 else:
                     self.get_logger().error("Failed to stop Servo controller: %s", future.result().message)
@@ -218,7 +216,7 @@ class ServoNode(Node):
                     
                     if (self.current_target_index%2) == 1 :
                         #To move to post pick position
-                        self.move_to_post_pick_pose()                    
+                        self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
                         self.detach_link_service()
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.box_done = True
@@ -238,10 +236,6 @@ class ServoNode(Node):
 
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
-
-    def move_to_post_pick_pose(self):
-
-        self.move_it_controller.move_to_home_and_drop_pose_after_servoing()
 
     def attach_link_service(self):
 
@@ -400,7 +394,6 @@ def main(args=None):
 
         servo_node = ServoNode(target_poses,target_rotations,obj_no)
 
-        
         while not servo_node.box_done :
 
             rclpy.spin_once(servo_node,timeout_sec=0.02)

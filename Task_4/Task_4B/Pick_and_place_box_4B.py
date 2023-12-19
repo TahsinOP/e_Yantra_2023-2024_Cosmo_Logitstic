@@ -2,7 +2,7 @@
 # Team ID:          1868
 # Theme:            Cosmo Logistic 
 # Author List:      Tahsin Khan , Chinmaya Sahu
-# Filename:        2task2b.py
+# Filename:        Pick_and_place_box_4B.py
 # Functions:        
 # Global variables: 
 '''
@@ -11,7 +11,7 @@
 from scipy.spatial.transform import Rotation as R
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException, TransformException, Buffer, TransformListener
 # from linkattacher_msgs.srv import AttachLink, DetachLink
-# from ur_msgs.srv import SetIO
+from ur_msgs.srv import SetIO
 
 from std_srvs.srv import Trigger 
 
@@ -235,12 +235,13 @@ class ServoNode(Node):
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
 
                 if distance < self.distance_threshold:
-                    self.attach_link_service()
-                    
+
+                    self.gripper_call(True)
+
                     if (self.current_target_index%2) == 1 :
                         #To move to post pick position
-                        self.move_to_post_pick_pose()                    
-                        self.detach_link_service()
+                        self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
+                        self.gripper_call(False)
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.box_done = True
                         if (self.box_done):
@@ -264,50 +265,20 @@ class ServoNode(Node):
 
         self.move_it_controller.move_to_home_and_drop_pose_after_servoing()
 
-    # def attach_link_service(self):
+    def gripper_call(self, state):  
 
-    #     attach_link_client = self.create_client(AttachLink, '/GripperMagnetON')
+        # Function to call the attach/detach function in UR5 hardware in Task4B
 
-    #     while not attach_link_client.wait_for_service(timeout_sec=1.0):
-    #         self.get_logger().info('AttachLink service not available, waiting...')
+        gripper_control = self.create_client(SetIO, '/io_and_status_controller/set_io')
+        while not gripper_control.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('EEF Tool service not available, waiting again...')
+        req         = SetIO.Request()
+        req.fun     = 1
+        req.pin     = 16
+        req.state   = float(state)
+        gripper_control.call_async(req)
+        return state
 
-    #     req = AttachLink.Request()
-    #     req.model1_name = f"box{self.obj_no}"  # Specify the box name
-    #     req.link1_name = 'link'
-    #     req.model2_name = 'ur5'
-    #     req.link2_name = 'wrist_3_link'
-
-    #     # Call the AttachLink service
-    #     future = attach_link_client.call_async(req)
-
-    #     if future.result() is not None:
-    #         if future.result().success:
-    #             self.get_logger().info("Attachment successful.")
-    #         else:
-    #             self.get_logger().error("Attachment failed: %s", future.result().message)
-
-    # def detach_link_service(self):
-
-    #     detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
-
-    #     while not  detach_link_client.wait_for_service(timeout_sec=1.0):
-    #         self.get_logger().info('detachLink service not available, waiting...')
-
-    #     req = DetachLink.Request()
-    #     req.model1_name = f"box{self.obj_no}"  # Specify the box name
-    #     req.link1_name = 'link'
-    #     req.model2_name = 'ur5'
-    #     req.link2_name = 'wrist_3_link'
-
-    #     # Call the AttachLink service
-    #     future = detach_link_client.call_async(req)    
-
-    #     if future.result() is not None:
-    #         if future.result().success:
-    #             self.get_logger().info("detachment successful.")
-    #             self.detached = True
-    #         else:
-    #             self.get_logger().error("detachment failed: %s", future.result().message)
 
 class MoveMultipleJointPositions(Node):
 
@@ -364,12 +335,11 @@ class MoveMultipleJointPositions(Node):
         executor = Thread(target= executor.spin, daemon=True, args=())
         executor.start()
         
-        cons = (math.pi)/180
-        joint_positions_1 = [joint_angle*cons for joint_angle in [0.0,-169,52,-241,-90,180]]
-        joint_positions_2 = [joint_angle*cons for joint_angle in [0.0, -137 , 138 ,-180 , -90 , 180]]
+        drop_pose =[-0.027, -1.803, -1.3658, -3.039, -1.52, 3.15]
+        home_pose =[0, -2.398, 2.43, -3.15, -1.58, 3.15]
 
         # Move to multiple joint configurations
-        self.move_to_multiple_joint_positions(joint_positions_2, joint_positions_1)
+        self.move_to_multiple_joint_positions(home_pose,drop_pose)
 
 def main(args=None):
     rclpy.init(args=args)
