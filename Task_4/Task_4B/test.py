@@ -87,7 +87,7 @@ class TFTopicListener(Node):
 
             if self.published_tf_name != []:
                 self.tf_recieved = True 
-                self.tf_timer.cancel()
+                self.tf_timer.reset()
 
             return [int(tf.split('_')[-1]) for tf in self.published_tf_name]
         
@@ -96,7 +96,7 @@ class TFTopicListener(Node):
 
 class TFListener(Node):
     def __init__(self,obj_no):
-        super().__init__(f'tf_listener{obj_no}')
+        super().__init__(f"tf_listener{obj_no}")
 
         self.obj_no = obj_no
 
@@ -129,7 +129,7 @@ class TFListener(Node):
             if not self.first_transform_received:
 
                 self.first_transform_received = True
-                self.timer.cancel()                
+                self.timer.reset()                
 
         except TransformException as e:
             self.get_logger().warning(f"Failed to lookup transforms: {e}")
@@ -150,7 +150,7 @@ class TFListener(Node):
 
 class ServoNode(Node):
     def __init__(self, target_poses, target_rotations, obj_no):
-        super().__init__(f'servo_node{obj_no}')
+        super().__init__(f'servo_node_{obj_no}')
 
         self.target_poses = target_poses
         self.target_rotations = target_rotations
@@ -166,10 +166,9 @@ class ServoNode(Node):
         cons = (math.pi)/180
         self.yaw_right_box_pose = [joint_angle*cons for joint_angle in [-90, -137 , 138 , -180 , -90 , 180 ]] 
         self.yaw_left_box_pose = [joint_angle*cons for joint_angle in [90, -137 , 138 , -180 , -90 , 180 ]] 
-        self.drop_pose =[-0.027, -1.803, -1.3658, -3.039, -1.52, 3.15]
         self.home_pose = [0.00, -2.398, 2.43, -3.15, -1.58, 3.15 ]
 
-        self.move_it_controller = MoveMultipleJointPositions(obj_no)                                 
+        self.move_it_controller = MoveMultipleJointPositions()                                 
         self.tf_buffer = Buffer(Duration(seconds=10.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -228,6 +227,8 @@ class ServoNode(Node):
                 if future.result().success:
                     self.get_logger().info("Servo controller stopped successfully.")
 
+                    self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
+
                 else:
                     self.get_logger().error("Failed to stop Servo controller: %s", future.result().message)
             else:
@@ -264,46 +265,37 @@ class ServoNode(Node):
 
                 #To position accordingly for left and right side boxes
                 if abs(yaw - math.pi/2) < self.error:
-                    self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
-                    self.timer.reset()
                     self.switch_controller(2)                     # Switch from move_it controller to servo 
                 elif abs(yaw - -math.pi/2) < self.error:
-                    self.timer.cancel
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
-                    self.timer.reset()
-                    self.switch_controller(2)   # Switch from move_it controller to servo 
+                    self.switch_controller(2)                      # Switch from move_it controller to servo 
+
 
                 diff = [target_pose[i] - current_translation[i] for i in range(3)]
 
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
 
                 if distance < self.distance_threshold:
-                    if (self.current_target_index%3) == 2 :
+
+                    # self.gripper_call(True)
+                    self.attach_link_service()
+
+                    if (self.current_target_index%2) == 1 :
                         #To move to post pick position
                         self.switch_controller(1)         # Switch from servo to move_it controller in hardware
-                        self.move_it_controller.move_to_a_joint_config(self.home_pose)
-                        self.move_it_controller.move_to_a_joint_config(self.drop_pose)
+                        self.move_it_controller.move_to_home_and_drop_pose_after_servoing() 
                         self.detach_link_service()                  
                         # self.gripper_call(False)
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
-                        self.box_done = True                    
-
-                    # elif self.current_target_index ==3:
-                    #     self.box_done = True
-
-                    elif self.current_target_index == 1:
-                        # self.gripper_call(True)
-                        self.attach_link_service()
+                        self.box_done = True
+                        if (self.box_done):
+                            self.timer.reset()       
 
                     self.current_target_index += 1
                     
-                    if (self.box_done):
-                        self.move_it_controller.destroy_node()
-                        self.timer.cancel() 
-
                 else:
-                    scaling_factor = 0.95
+                    scaling_factor = 0.8
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
                     twist_msg.twist.linear.x = diff[0] * scaling_factor
@@ -399,11 +391,23 @@ class ServoNode(Node):
 
 class MoveMultipleJointPositions(Node):
 
-    def __init__(self,obj_no):
-        super().__init__(f'move_multiple_joint_positions{obj_no}')
+    def __init__(self):
+        super().__init__('move_multiple_joint_positions')
         self.moveit2 = None
         self.detached = False
         self.movit_done = False
+
+    def move_to_multiple_joint_positions(self, *joint_positions):
+
+        for i, positions in enumerate(joint_positions, start=1):
+            param_name = f"joint_positions_{i}"
+            self.declare_parameter(param_name, positions)
+
+            joint_positions = self.get_parameter(param_name).get_parameter_value().double_array_value
+
+            self.get_logger().info(f"Moving to {param_name}: {list(joint_positions)}")
+            self.moveit2.move_to_configuration(joint_positions)
+            self.moveit2.wait_until_executed()
     
     def move_to_a_joint_config(self,joint_position):
 
@@ -416,7 +420,7 @@ class MoveMultipleJointPositions(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
-        executor = MultiThreadedExecutor(3)
+        executor = MultiThreadedExecutor(1)
         executor.add_node(self)
         executor = Thread(target= executor.spin, daemon=True, args=())
         executor.start()
@@ -424,8 +428,29 @@ class MoveMultipleJointPositions(Node):
         self.moveit2.wait_until_executed()
     
 
-def main(args=None):
+    def move_to_home_and_drop_pose_after_servoing(self):
 
+        self.moveit2 = MoveIt2(
+            node=self,
+            joint_names=ur5.joint_names(),
+            base_link_name=ur5.base_link_name(),
+            end_effector_name=ur5.end_effector_name(),
+            group_name=ur5.MOVE_GROUP_ARM,
+            callback_group=ReentrantCallbackGroup()
+        )
+
+        executor = MultiThreadedExecutor(1)
+        executor.add_node(self)
+        executor = Thread(target= executor.spin, daemon=True, args=())
+        executor.start()
+        
+        drop_pose =[-0.027, -1.803, -1.3658, -3.039, -1.52, 3.15]
+        home_pose =[0.00, -2.398, 2.43, -3.15, -1.58, 3.15]
+
+        # Move to multiple joint configurations
+        self.move_to_multiple_joint_positions(home_pose,drop_pose)
+
+def main(args=None):
     rclpy.init(args=args)
     
     tf_topic_listener = TFTopicListener()
@@ -439,7 +464,6 @@ def main(args=None):
     print(obj_numbers)
 
     for obj_no in obj_numbers:
-
         tf_listener_node = TFListener(obj_no)
 
         while not tf_listener_node.first_transform_received:
@@ -464,29 +488,37 @@ def main(args=None):
 
         #We have to account for the different orientations of the boxes
         if abs(yaw - math.pi/2) < error:
-            post_pick[0] -= 0.17
+            post_pick[0] -= 0.175
         elif abs(yaw - 0) < error:
-            post_pick[1] += 0.17
-        else:
-            post_pick[1] -= 0.17   #Right hand side while facing the racks
+            post_pick[1] += 0.175
+        elif abs(yaw - math.pi) < error:
+            post_pick[1] -= 0.175   #Right hand side while facing the racks
             
 
-        target_poses = [post_pick,tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
-        target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(3)]
+        target_poses = [tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
+        target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(2)]
+
 
         servo_node = ServoNode(target_poses,target_rotations,obj_no)
+
 
         while not servo_node.box_done :
 
             rclpy.spin_once(servo_node,timeout_sec=0.02)
         
-        # servo_node.move_it_controller.destroy_node()
+        print("llll")
+
+        tf_listener_node.destroy_node()
 
         servo_node.get_logger().info("Shutting down Servo Node")
 
-        servo_node.destroy_node() 
+        servo_node.destroy_node()
 
-    print('Pick and place operation completed')
+        
+
+
+        print('Pick and place operation completed')
+
 
     rclpy.shutdown()
 
