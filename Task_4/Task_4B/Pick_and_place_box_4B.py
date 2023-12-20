@@ -11,7 +11,7 @@
 from scipy.spatial.transform import Rotation as R
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException, TransformException, Buffer, TransformListener
 
-# from ur_msgs.srv import SetIO
+from ur_msgs.srv import SetIO
 from std_srvs.srv import Trigger 
 from controller_manager_msgs.srv import SwitchController
 from linkattacher_msgs.srv import AttachLink, DetachLink
@@ -284,8 +284,8 @@ class ServoNode(Node):
                         self.switch_controller(1)         # Switch from servo to move_it controller in hardware
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.move_it_controller.move_to_a_joint_config(self.drop_pose)
-                        self.detach_link_service()                  
-                        # self.gripper_call(False)
+                        # self.detach_link_service()                  
+                        self.gripper_call(False)
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.box_done = True                    
 
@@ -293,17 +293,18 @@ class ServoNode(Node):
                     #     self.box_done = True
 
                     elif self.current_target_index == 1:
-                        # self.gripper_call(True)
-                        self.attach_link_service()
+                        self.gripper_call(True)
+                        # self.attach_link_service()
 
                     self.current_target_index += 1
-                    
+
                     if (self.box_done):
+
                         self.move_it_controller.destroy_node()
                         self.timer.cancel() 
 
                 else:
-                    scaling_factor = 0.95
+                    scaling_factor = 1.5
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
                     twist_msg.twist.linear.x = diff[0] * scaling_factor
@@ -416,7 +417,7 @@ class MoveMultipleJointPositions(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
-        executor = MultiThreadedExecutor(3)
+        executor = MultiThreadedExecutor(1)
         executor.add_node(self)
         executor = Thread(target= executor.spin, daemon=True, args=())
         executor.start()
