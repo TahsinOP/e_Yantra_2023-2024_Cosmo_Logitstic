@@ -274,10 +274,8 @@ class ServoNode(Node):
                     self.timer.cancel
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
                     self.timer.reset()
-                    self.switch_controller(2)    # Switch from move_it controller to servo 
-                else :
-                    self.switch_controller(1)
-                    
+                    self.switch_controller(2)   # Switch from move_it controller to servo 
+
                 diff = [target_pose[i] - current_translation[i] for i in range(3)]
 
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
@@ -308,12 +306,12 @@ class ServoNode(Node):
                         self.timer.cancel() 
 
                 else:
-                    scaling_factor = 0.5
+                    scaling_factor = 0.85
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
-                    twist_msg.twist.linear.x = diff[0] * scaling_factor
-                    twist_msg.twist.linear.y = diff[1] * scaling_factor
-                    twist_msg.twist.linear.z = diff[2] * scaling_factor
+                    twist_msg.twist.linear.z = diff[0] * scaling_factor
+                    twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                    twist_msg.twist.linear.x = diff[2] * scaling_factor
 
                     print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
                     self.twist_pub.publish(twist_msg)
@@ -446,7 +444,7 @@ def main(args=None):
     print(obj_numbers)
 
 
-    
+    # obj_numbers = [15,2]
 
     for obj_no in obj_numbers:
 
