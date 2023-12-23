@@ -158,7 +158,7 @@ class ServoNode(Node):
         self.ids = [obj_no]
 
         self.distance_threshold = 0.02
-        self.error = 0.05
+        self.error = 0.05   # Yaw error for side boxes 
         self.current_target_index = 0
         self.box_done = False
 
@@ -177,7 +177,7 @@ class ServoNode(Node):
 
         self.twist_pub = self.create_publisher(TwistStamped, "/servo_node/delta_twist_cmds", 10)
         self.__contolMSwitch = self.create_client(SwitchController, "/controller_manager/switch_controller")
-
+        self.switch_controller(2)
         self.start_servo_service()
 
         self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
@@ -358,50 +358,50 @@ class ServoNode(Node):
         self.__contolMSwitch.call_async(switchParam)
         print("[CM]: Switching Complete")
     
-    def attach_link_service(self):
+    # def attach_link_service(self):
 
-        attach_link_client = self.create_client(AttachLink, '/GripperMagnetON')
+    #     attach_link_client = self.create_client(AttachLink, '/GripperMagnetON')
 
-        while not attach_link_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('AttachLink service not available, waiting...')
+    #     while not attach_link_client.wait_for_service(timeout_sec=1.0):
+    #         self.get_logger().info('AttachLink service not available, waiting...')
 
-        req = AttachLink.Request()
-        req.model1_name = f"box{self.obj_no}"  # Specify the box name
-        req.link1_name = 'link'
-        req.model2_name = 'ur5'
-        req.link2_name = 'wrist_3_link'
+    #     req = AttachLink.Request()
+    #     req.model1_name = f"box{self.obj_no}"  # Specify the box name
+    #     req.link1_name = 'link'
+    #     req.model2_name = 'ur5'
+    #     req.link2_name = 'wrist_3_link'
 
-        # Call the AttachLink service
-        future = attach_link_client.call_async(req)
+    #     # Call the AttachLink service
+    #     future = attach_link_client.call_async(req)
 
-        if future.result() is not None:
-            if future.result().success:
-                self.get_logger().info("Attachment successful.")
-            else:
-                self.get_logger().error("Attachment failed: %s", future.result().message)
+    #     if future.result() is not None:
+    #         if future.result().success:
+    #             self.get_logger().info("Attachment successful.")
+    #         else:
+    #             self.get_logger().error("Attachment failed: %s", future.result().message)
 
-    def detach_link_service(self):
+    # def detach_link_service(self):
 
-        detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
+    #     detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
 
-        while not  detach_link_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('detachLink service not available, waiting...')
+    #     while not  detach_link_client.wait_for_service(timeout_sec=1.0):
+    #         self.get_logger().info('detachLink service not available, waiting...')
 
-        req = DetachLink.Request()
-        req.model1_name = f"box{self.obj_no}"  # Specify the box name
-        req.link1_name = 'link'
-        req.model2_name = 'ur5'
-        req.link2_name = 'wrist_3_link'
+    #     req = DetachLink.Request()
+    #     req.model1_name = f"box{self.obj_no}"  # Specify the box name
+    #     req.link1_name = 'link'
+    #     req.model2_name = 'ur5'
+    #     req.link2_name = 'wrist_3_link'
 
-        # Call the AttachLink service
-        future = detach_link_client.call_async(req)    
+    #     # Call the AttachLink service
+    #     future = detach_link_client.call_async(req)    
 
-        if future.result() is not None:
-            if future.result().success:
-                self.get_logger().info("detachment successful.")
-                self.detached = True
-            else:
-                self.get_logger().error("detachment failed: %s", future.result().message)
+    #     if future.result() is not None:
+    #         if future.result().success:
+    #             self.get_logger().info("detachment successful.")
+    #             self.detached = True
+    #         else:
+    #             self.get_logger().error("detachment failed: %s", future.result().message)
 
 
 class MoveMultipleJointPositions(Node):

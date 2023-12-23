@@ -178,6 +178,7 @@ class ServoNode(Node):
         self.twist_pub = self.create_publisher(TwistStamped, "/servo_node/delta_twist_cmds", 10)
         self.__contolMSwitch = self.create_client(SwitchController, "/controller_manager/switch_controller")
 
+        self.switch_controller(2)
         self.start_servo_service()
 
         self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
@@ -266,11 +267,13 @@ class ServoNode(Node):
 
                 #To position accordingly for left and right side boxes
                 if abs(yaw - math.pi/2) < self.error:
+                    self.switch_controller(1)
                     self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
                     self.timer.reset()
                     self.switch_controller(2)                     # Switch from move_it controller to servo 
                 elif abs(yaw - -math.pi/2) < self.error:
+                    self.switch_controller(1)
                     self.timer.cancel
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
                     self.timer.reset()
@@ -306,7 +309,7 @@ class ServoNode(Node):
                         self.timer.cancel() 
 
                 else:
-                    scaling_factor = 0.85
+                    scaling_factor = 0.5
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
                     twist_msg.twist.linear.z = diff[0] * scaling_factor
