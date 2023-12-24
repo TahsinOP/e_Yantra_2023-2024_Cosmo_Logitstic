@@ -52,7 +52,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 ## Task 4 : ( Deadline : 19th January )
 1. Task 4A : 
 
-2. Task 4B : First slot completed 
+2. Task 4B : First slot completed ( Marks : 6/35)
     
    Status : Arm moved till BOX but haunted around it
    Issues reloved : Changed the mapping of axis in hardware ("tool0" link )
