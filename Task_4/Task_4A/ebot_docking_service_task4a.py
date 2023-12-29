@@ -98,7 +98,7 @@ class MyRobotDockingController(Node):
             self.velocity_pub.publish(velocity_msg)
             
                 # Check if the robot is aligned within a threshold
-            if abs(angular_error) < 0.07:
+            if abs(angular_error) < 0.02:
                 self.dock_aligned = True
                 self.get_logger().info("Robot is aligned for docking.")
             else:
