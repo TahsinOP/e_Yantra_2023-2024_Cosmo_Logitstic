@@ -44,7 +44,7 @@ class NavigationAndDockingNode(Node):
         self.docked = False                 # Flag to determine if docking is completed or not 
         self.target_angle_rack_3  = 3.14
         self.target_angle_rack_1 = -3.14
-        self.dock_service_error = 0.07
+        self.dock_service_error = 0.02
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
