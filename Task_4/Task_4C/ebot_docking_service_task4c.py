@@ -94,7 +94,7 @@ class MyRobotDockingController(Node):
 
         
         if self.is_docking :
-
+                
             # Calculate angular correction to align the robot with the desired orientation
             target_angle = self.dock_pose[1] 
             angular_error = self.normalize_angle(target_angle - self.robot_pose[2])

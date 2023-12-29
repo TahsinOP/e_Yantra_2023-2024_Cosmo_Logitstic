@@ -43,10 +43,12 @@ class NavigationAndDockingNode(Node):
         self.target_angle_rack_3  = 3.14
         self.target_angle_rack_1 = -3.14
         self.dock_service_error = 0.02
-        self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
+        self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.16]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
+        self.pre_dock_correction_factors_rack2 = []
         self.arm_pose_correction_factors_rack1 = []
         self.arm_pose_correction_factors_rack3 = []
+        self.arm_pose_correction_factors_rack2 = []
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
         self.link_attach_client = self.create_client(AttachLink, '/ATTACH_LINK')
         self.link_detach_client = self.create_client(DetachLink, '/DETACH_LINK')
@@ -140,19 +142,22 @@ class NavigationAndDockingNode(Node):
     def navigate_to_arm_pose(self):   
         if self.package_id == 3 :         # Condition to check the packages ids and allot its respective post-docking angles 
             self.arm_orientation = 2.291  
+            
 
         elif self.package_id == 1:
             self.arm_orientation = -1.4597
+            self.arm_pose_x = 0.85
+            self.arm_pose_y = -2.30
 
-        pose_euler = [0,0,self.arm_orientation]
+        pose_euler = [0,0,0]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.85    # Co-ordinates of the arm pose 
-        goal_pose.pose.position.y = -2.3 
+        goal_pose.pose.position.x = self.arm_pose_x  # Co-ordinates of the arm pose 
+        goal_pose.pose.position.y = self.arm_pose_y
 
         goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
         goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
