@@ -44,7 +44,7 @@ class NavigationAndDockingNode(Node):
         self.docked = False                 # Flag to determine if docking is completed or not 
         self.target_angle_rack_3  = 0.00
         self.target_angle_rack_1 = -3.14
-        self.dock_service_error = 0.07
+        self.dock_service_error = 0.1    # Increase this factor in the 2nd Slot !!!!!!!!!!!
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
@@ -88,7 +88,7 @@ class NavigationAndDockingNode(Node):
         
         self.robot_pose[2] = yaw 
     
-    def orientation_callback(self,msg):
+    def orientation_callback(self,msg):     # Complete the callback function and replace the robot_pose by yaw !!!!!!!!!!!
 
         self.yaw = msg.data
 
@@ -152,7 +152,11 @@ class NavigationAndDockingNode(Node):
             self.get_logger().error('Navigation to the new pose failed.')       
     
     def navigate_and_dock(self):
-        pose_euler = [0,0,0]
+
+        X = 1.05      # Update this values according to the given values !!!!!!!!!!!!!
+        Y = 2.04
+        Yaw = 0.0
+        pose_euler = [0,0,Yaw]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
 
@@ -160,8 +164,8 @@ class NavigationAndDockingNode(Node):
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 1.05
-        goal_pose.pose.position.y = 2.04
+        goal_pose.pose.position.x = X
+        goal_pose.pose.position.y = Y
         goal_pose.pose.orientation.z = pose_quat[2]
         goal_pose.pose.orientation.w = pose_quat[3]
 
@@ -197,7 +201,7 @@ class NavigationAndDockingNode(Node):
                 rclpy.spin_once(self)
 
             self.get_logger().info("Robot is near the rack . Triggering attachment service.")
-            # self.attach_usb_relay("ON")
+            # self.attach_usb_relay("ON")        Call the attach usb function after docking !!!!!!!!!!!!!!!!!!!!!!!
         else:
             self.get_logger().error("Docking service failed.")
 
@@ -223,7 +227,7 @@ class NavigationAndDockingNode(Node):
         else:
             self.get_logger().error("Docking service failed.")
 
-    def attach_usb_relay(self,magnet_condition):
+    def attach_usb_relay(self,magnet_condition):                                  # Copy the attach function from the template code !!!!!!!!!!    
 
         if magnet_condition == "ON":
             relay_channel = 0

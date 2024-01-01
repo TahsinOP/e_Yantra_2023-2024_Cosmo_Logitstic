@@ -36,7 +36,8 @@ class MyRobotDockingController(Node):
 
         # Subscribe to odometry data for robot pose information
         self.odom_sub = self.create_subscription(Odometry, 'odom', self.odometry_callback, 10)
-        self.orientation_sub_for_docking = self.create_subscription(Float32,'orientation',self.orientation_callback,10)
+
+        self.orientation_sub_for_docking = self.create_subscription(Float32,'orientation',self.orientation_callback,10)   # Topic for hardware !!!!!!!!!!!
 
         # Subscribe to ultrasonic sensor data for distance measurements
         self.ultra_sub_for_docking = self.create_subscription(Float32MultiArray, 'ultrasonic_sensor_std_float', self.ultra_callback, 10)
@@ -72,9 +73,9 @@ class MyRobotDockingController(Node):
         self.ultra_left= msg.data[4]
         self.ultra_right = msg.data[5]
     
-    def orientation_callback(self,msg):
+    def orientation_callback(self,msg):    
 
-        self.yaw = msg.data
+        self.yaw = msg.data   # Use the yaw obtained in controller_loop function !!!!!!!!!!
 
     # Utility function to normalize angles within the range of -π to π (OPTIONAL)
     def normalize_angle(self, angle):
@@ -87,23 +88,28 @@ class MyRobotDockingController(Node):
     # Main control loop for managing docking behavior
     def controller_loop(self):
 
+        Controller_gain = 0.5     # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
+        error = 0.1   
+
         angular_speed = 0.0
         linear_speed = 0.0 
 
         
         if self.is_docking :
-                
+
             # Calculate angular correction to align the robot with the desired orientation
             target_angle = self.dock_pose[1] 
-            angular_error = self.normalize_angle(target_angle - self.robot_pose[2])
-            angular_speed = 0.7 * angular_error  # P-controller for angular correction
+
+            angular_error = self.normalize_angle(target_angle - self.yaw)     # Check the code also by removing the normalize angle function !!!!!!!!!!!!!!
+
+            angular_speed = Controller_gain * angular_error  
             velocity_msg = Twist()
             velocity_msg.angular.z = angular_speed
 
             self.velocity_pub.publish(velocity_msg)
             
                 # Check if the robot is aligned within a threshold
-            if abs(angular_error) < 0.07:
+            if abs(angular_error) < error:
                 self.dock_aligned = True
                 self.get_logger().info("Robot is aligned for docking.")
             else:

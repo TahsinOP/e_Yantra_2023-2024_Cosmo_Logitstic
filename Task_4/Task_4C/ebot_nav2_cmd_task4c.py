@@ -187,7 +187,7 @@ class NavigationAndDockingNode(Node):
             print(self.rack_orientation)
 
         elif self.package_id == 1:
-            self.corrected_rack_orientation = self.rack_orientation +self.pre_dock_correction_factors_rack1[0]      # Correction factors for pre-dock poses
+            self.corrected_rack_orientation = self.rack_orientation     # Correction factors for pre-dock poses
             self.corrected_rack_pose_x = self.rack_pose_x+self.pre_dock_correction_factors_rack1[1]
             self.corrected_rack_pose_y = self.rack_pose_y+self.pre_dock_correction_factors_rack1[2]
 
