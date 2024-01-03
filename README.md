@@ -2,12 +2,12 @@
 ### Team Members : Tahsin Khan,Chinmaya Sahu 
 ### Team ID : 1868
 # Stage - 1 : ( Completed ) 
-## Task 1: - ( Completed )
+## Task 1: - ( Completed - 100/100)
 1. Write proper and clean code for Task 1A (correct the hard code part of one box) - ( Completed )
 2. Implement and learn the servo method for Task 1B (optional) - ( Completed )
 3. Use the `nav_to_pose` method for Task 1C (current code waypoint_nav method) - ( Completed)
 
-## Task 2: - (Completed)
+## Task 2: - (Completed - 100/100)
 
 1. Task 2A (Completed) : Correct the aruco box estimation code in task1A , use the TF recieved of the boxes w.r.t to base_link now need to use move it servo to pick the boxes , use the gripper service to grab it and place at drop pose .
 
@@ -25,9 +25,9 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/c13fb30d-3859-417b-b385-ca64f45a9aaa
    
 # Stage - 2 : (Selected) 
-## Task 3 : (Completed) 
+## Task 3 : (Completed - 97.26/100) 
 
-1. Task 3A : (Completed - 97.26/100)
+1. Task 3A : (Completed)
    
    Issues resolved :
    1. launching of the 3A script (solved : Increased the image processing rate ) 
