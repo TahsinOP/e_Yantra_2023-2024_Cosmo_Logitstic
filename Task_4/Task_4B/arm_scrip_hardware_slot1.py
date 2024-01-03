@@ -309,7 +309,7 @@ class ServoNode(Node):
                         self.timer.cancel() 
 
                 else:
-                    scaling_factor = 0.5
+                    scaling_factor = 0.2
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
                     twist_msg.twist.linear.z = diff[0] * scaling_factor
@@ -359,51 +359,6 @@ class ServoNode(Node):
         self.__contolMSwitch.call_async(switchParam)
         print("[CM]: Switching Complete")
     
-    def attach_link_service(self):
-
-        attach_link_client = self.create_client(AttachLink, '/GripperMagnetON')
-
-        while not attach_link_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('AttachLink service not available, waiting...')
-
-        req = AttachLink.Request()
-        req.model1_name = f"box{self.obj_no}"  # Specify the box name
-        req.link1_name = 'link'
-        req.model2_name = 'ur5'
-        req.link2_name = 'wrist_3_link'
-
-        # Call the AttachLink service
-        future = attach_link_client.call_async(req)
-
-        if future.result() is not None:
-            if future.result().success:
-                self.get_logger().info("Attachment successful.")
-            else:
-                self.get_logger().error("Attachment failed: %s", future.result().message)
-
-    def detach_link_service(self):
-
-        detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
-
-        while not  detach_link_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('detachLink service not available, waiting...')
-
-        req = DetachLink.Request()
-        req.model1_name = f"box{self.obj_no}"  # Specify the box name
-        req.link1_name = 'link'
-        req.model2_name = 'ur5'
-        req.link2_name = 'wrist_3_link'
-
-        # Call the AttachLink service
-        future = detach_link_client.call_async(req)    
-
-        if future.result() is not None:
-            if future.result().success:
-                self.get_logger().info("detachment successful.")
-                self.detached = True
-            else:
-                self.get_logger().error("detachment failed: %s", future.result().message)
-
 
 class MoveMultipleJointPositions(Node):
 

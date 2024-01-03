@@ -42,9 +42,9 @@ class NavigationAndDockingNode(Node):
         self.docked = False                 # Flag to determine if docking is completed or not 
         self.target_angle_rack_3  = 3.14
         self.target_angle_rack_1 = -3.14
-        self.dock_service_error = 0.02
-        self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.16]
-        self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
+        self.dock_service_error = 0.05
+        self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.09]
+        self.pre_dock_correction_factors_rack3 = [-0.57,-0.3,0.6]
         self.pre_dock_correction_factors_rack2 = []
         self.arm_pose_correction_factors_rack1 = []
         self.arm_pose_correction_factors_rack3 = []
@@ -141,15 +141,17 @@ class NavigationAndDockingNode(Node):
 
     def navigate_to_arm_pose(self):   
         if self.package_id == 3 :         # Condition to check the packages ids and allot its respective post-docking angles 
-            self.arm_orientation = 2.291  
+            self.arm_orientation = self.rack_orientation
+            self.arm_pose_x = self.rack_pose_x
+            self.arm_pose_y = self.rack_pose_y - 0.3
             
 
         elif self.package_id == 1:
-            self.arm_orientation = -1.4597
+            self.arm_orientation = 0.5
             self.arm_pose_x = 0.85
             self.arm_pose_y = -2.30
 
-        pose_euler = [0,0,0]
+        pose_euler = [0,0,self.arm_orientation]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
 
@@ -180,14 +182,14 @@ class NavigationAndDockingNode(Node):
     
     def navigate_and_dock(self):
         if self.package_id == 3 : 
-            self.corrected_rack_orientation = self.rack_orientation +self.pre_dock_correction_factors_rack3[0]      # Correction factors for pre-dock poses
+            self.corrected_rack_orientation = self.rack_orientation      # Correction factors for pre-dock poses
             self.corrected_rack_pose_x = self.rack_pose_x+self.pre_dock_correction_factors_rack3[1]
             self.corrected_rack_pose_y = self.rack_pose_y+self.pre_dock_correction_factors_rack3[2]
 
             print(self.rack_orientation)
 
         elif self.package_id == 1:
-            self.corrected_rack_orientation = self.rack_orientation     # Correction factors for pre-dock poses
+            self.corrected_rack_orientation = self.rack_orientation + self.pre_dock_correction_factors_rack1[0]     # Correction factors for pre-dock poses
             self.corrected_rack_pose_x = self.rack_pose_x+self.pre_dock_correction_factors_rack1[1]
             self.corrected_rack_pose_y = self.rack_pose_y+self.pre_dock_correction_factors_rack1[2]
 

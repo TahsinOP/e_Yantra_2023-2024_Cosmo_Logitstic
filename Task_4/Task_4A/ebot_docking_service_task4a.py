@@ -33,11 +33,13 @@ class MyRobotDockingController(Node):
 
         # Create a callback group for managing callbacks
         self.callback_group = ReentrantCallbackGroup()
+        self.yaw = None
 
         # Subscribe to odometry data for robot pose information
         self.odom_sub = self.create_subscription(Odometry, 'odom', self.odometry_callback, 10)
 
-        self.orientation_sub_for_docking = self.create_subscription(Float32,'orientation',self.orientation_callback,10)   # Topic for hardware !!!!!!!!!!!
+        self.orientation_sub_for_docking = self.create_subscription(Float32,'orientation',self.orientation_callback,10)   # Topic for hardware !!!!!!!!!!!DONE
+        
 
         # Subscribe to ultrasonic sensor data for distance measurements
         self.ultra_sub_for_docking = self.create_subscription(Float32MultiArray, 'ultrasonic_sensor_std_float', self.ultra_callback, 10)
@@ -75,7 +77,8 @@ class MyRobotDockingController(Node):
     
     def orientation_callback(self,msg):    
 
-        self.yaw = msg.data   # Use the yaw obtained in controller_loop function !!!!!!!!!!
+        self.yaw = msg.data 
+        print(f"yaw is {self.yaw}")  # Use the yaw obtained in controller_loop function !!!!!!!!!!DONE
 
     # Utility function to normalize angles within the range of -π to π (OPTIONAL)
     def normalize_angle(self, angle):
@@ -87,10 +90,10 @@ class MyRobotDockingController(Node):
 
     # Main control loop for managing docking behavior
     def controller_loop(self):
-
-        Controller_gain = 0.5     # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
-        error = 0.1   
-
+        
+        Controller_gain = 0.2     # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
+        error = 0.2  
+      
         angular_speed = 0.0
         linear_speed = 0.0 
 
@@ -100,7 +103,9 @@ class MyRobotDockingController(Node):
             # Calculate angular correction to align the robot with the desired orientation
             target_angle = self.dock_pose[1] 
 
-            angular_error = self.normalize_angle(target_angle - self.yaw)     # Check the code also by removing the normalize angle function !!!!!!!!!!!!!!
+            angular_error = target_angle - self.yaw
+            print(f"angular error is {angular_error}") 
+              # Check the code also by removing the normalize angle function !!!!!!!!!!!!!!
 
             angular_speed = Controller_gain * angular_error  
             velocity_msg = Twist()
@@ -138,10 +143,12 @@ class MyRobotDockingController(Node):
         # Implement linear correction based on ultrasonic sensor data
         # Use ultrasonic sensor data to find the rear distance and adjust linear_speed
         rear_distance = min(self.ultra_left, self.ultra_right)
+        rear_distance = rear_distance/100
+        print(f"distance is {rear_distance}")
 
         if rear_distance > 1.0:
-            linear_speed = 0.2  # Move forward when rear distance is safe
-        elif rear_distance < 0.15:
+            linear_speed = -0.2  # Move forward when rear distance is safe
+        elif rear_distance < 0.25:
             linear_speed = 0.0  # Stop when getting closer to the rack
         else:
             linear_speed = -0.2  # Move back if too close to an obstacle
