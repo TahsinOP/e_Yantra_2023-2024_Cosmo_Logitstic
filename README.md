@@ -50,12 +50,15 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/a50750c0-593b-4c77-90c6-3d2d47225154
 
 ## Task 4 : ( Deadline : 19th January )
-1. Task 4A : 
+1. Task 4A : 2nd slot completed ( Marks : 10/35)
 
-2. Task 4B : First slot completed ( Marks : 6/35)
+   Status : Navigation and docking completed ( Need to attach and undock)
+   Issues resolved : Docking error and ultrasonic sensor unit callibiration 
+
+3. Task 4B : 2nd slot completed ( Marks : 20/35)
     
-   Status : Arm moved till BOX but haunted around it
-   Issues reloved : Changed the mapping of axis in hardware ("tool0" link )
+   Status : Picked and placed front box succefully , need to take care of the side box
+   Issues reloved : Changed the mapping of axis in hardware ("tool0" link ),Tuned the scaling factor and distance threshold to reach the front box 
 
-3. Task 4C : 
+4. Task 4C : 
 
