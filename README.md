@@ -36,7 +36,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 ![Screenshot from 2023-12-08 14-22-55](https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/e557d9ea-713e-436e-85cb-b394cb4cbd4a)
 
    
-2. Task 3B : (Completed) 
+2. Task 3B : (Completed - 97.26/100) 
 
     Created a custom ROS2 python launch file to launch all the python scripts in the below order :
    
