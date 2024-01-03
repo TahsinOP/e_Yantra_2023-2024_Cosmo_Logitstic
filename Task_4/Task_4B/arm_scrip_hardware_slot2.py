@@ -11,7 +11,7 @@
 from scipy.spatial.transform import Rotation as R
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException, TransformException, Buffer, TransformListener
 
-# from ur_msgs.srv import SetIO
+from ur_msgs.srv import SetIO
 from std_srvs.srv import Trigger 
 from controller_manager_msgs.srv import SwitchController
 # from linkattacher_msgs.srv import AttachLink, DetachLink
@@ -157,7 +157,7 @@ class ServoNode(Node):
         self.obj_no = obj_no
         self.ids = [obj_no]
 
-        self.distance_threshold = 0.02
+        self.distance_threshold = 0.11
         self.error = 0.05
         self.current_target_index = 0
         self.box_done = False
@@ -309,7 +309,8 @@ class ServoNode(Node):
                         self.timer.cancel() 
 
                 else:
-                    scaling_factor = 0.2
+                    scaling_factor = 0.7
+
                     twist_msg = TwistStamped()
                     twist_msg.header.stamp = self.get_clock().now().to_msg()
                     twist_msg.twist.linear.z = diff[0] * scaling_factor
@@ -402,7 +403,7 @@ def main(args=None):
     print(obj_numbers)
 
 
-    # obj_numbers = [15,2]
+    obj_numbers = [15,2]
 
     for obj_no in obj_numbers:
 
@@ -437,7 +438,7 @@ def main(args=None):
             post_pick[1] -= 0.17   #Right hand side while facing the racks
             
 
-        target_poses = [post_pick,tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
+        target_poses = [tf_listener_node.get_transform(obj_name),tf_listener_node.get_transform(obj_name),tf_listener_node.get_transform(obj_name)] #First the arm will attach to the box, and bring it back
         target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(3)]
 
         servo_node = ServoNode(target_poses,target_rotations,obj_no)
