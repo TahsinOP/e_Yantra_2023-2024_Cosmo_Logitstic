@@ -406,9 +406,6 @@ class aruco_tf(Node):
         
         center_aruco_list, distance_from_rgb_list, angle_aruco_list, ids, rvec_list, tvec_list = detect_aruco(self.cv_image)
 
-
-      
-     
         
 
         
@@ -463,7 +460,7 @@ class aruco_tf(Node):
 
             rotation_matrix_from_rvec = R.from_rotvec(rvec.reshape(3,))
             rotation_matrix_from_rvec = rotation_matrix_from_rvec.as_matrix()
-           
+
             final_vector = np.dot(rotation_matrix_from_rvec,marker_frame_vec)
             cam_frame_vector = tvec + final_vector
             cam_frame_vector = cam_frame_vector.reshape(-1, 1)
@@ -493,7 +490,6 @@ class aruco_tf(Node):
                 base_to_camera = self.tf_buffer.lookup_transform('base_link',f'1868_cam_{marker_id}', rclpy.time.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
-           
 
             # print(transform_stamped.transform.rotation)
             print(base_to_camera.transform.rotation)
@@ -510,18 +506,9 @@ class aruco_tf(Node):
             transform_stamped.transform.rotation.y = base_to_camera.transform.rotation.y
             transform_stamped.transform.rotation.z = base_to_camera.transform.rotation.z
             self.br.sendTransform(transform_stamped)
-        
-       
-
-        
-
-
         # Show the image with detected markers and center points
         cv2.imshow('Aruco Markers', self.cv_image)
         cv2.waitKey(10)  # Adjust the delay as needed
-
-      
-
 
 ##################### FUNCTION DEFINITION #######################
 
