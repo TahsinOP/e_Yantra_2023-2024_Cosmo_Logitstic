@@ -312,13 +312,40 @@ class ServoNode(Node):
                     scaling_factor = 0.7
 
                     twist_msg = TwistStamped()
-                    twist_msg.header.stamp = self.get_clock().now().to_msg()
-                    twist_msg.twist.linear.z = diff[0] * scaling_factor
-                    twist_msg.twist.linear.y = -diff[1] * scaling_factor
-                    twist_msg.twist.linear.x = diff[2] * scaling_factor
 
-                    print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
-                    self.twist_pub.publish(twist_msg)
+                    if abs(yaw - math.pi/2) < self.error: #This is for the left box
+                        print("You are working with the left box")
+                        twist_msg.header.stamp = self.get_clock().now().to_msg()
+                        twist_msg.twist.linear.z = diff[0] * scaling_factor
+                        twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        twist_msg.twist.linear.x = diff[2] * scaling_factor
+    
+                        print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
+                        self.twist_pub.publish(twist_msg)
+                        
+                    elif abs(yaw - -math.pi/2) < self.error: #This is for the right box
+                        print("You are working with the right box")
+                        twist_msg.header.stamp = self.get_clock().now().to_msg()
+
+                        twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        
+                        twist_msg.twist.linear.z = diff[0] * scaling_factor
+                        twist_msg.twist.linear.x = diff[2] * scaling_factor
+
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+    
+                        print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
+                        self.twist_pub.publish(twist_msg)
+                    else: #This is normal for the front box
+                        print("You are working with the front box")
+                        twist_msg.header.stamp = self.get_clock().now().to_msg()
+                        twist_msg.twist.linear.z = diff[0] * scaling_factor
+                        twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        twist_msg.twist.linear.x = diff[2] * scaling_factor
+    
+                        print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
+                        self.twist_pub.publish(twist_msg)
 
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
@@ -403,7 +430,7 @@ def main(args=None):
     print(obj_numbers)
 
 
-    obj_numbers = [15,2]
+    obj_numbers = [15,2] #Keep only the right box in the loop for the task!!!!!
 
     for obj_no in obj_numbers:
 
