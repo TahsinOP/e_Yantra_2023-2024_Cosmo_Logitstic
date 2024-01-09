@@ -157,8 +157,12 @@ class ServoNode(Node):
         self.obj_no = obj_no
         self.ids = [obj_no]
 
-        self.distance_threshold = 0.11
-        self.error = 0.05
+        self.distance_threshold_front = 0.11
+        self.distance_threshold_right = 0.12
+
+        self.box_side = "front"
+        
+        self.error = 0.2
         self.current_target_index = 0
         self.box_done = False
 
@@ -270,12 +274,14 @@ class ServoNode(Node):
                     self.switch_controller(1)
                     self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
+                    self.box_side = "left"
                     self.timer.reset()
                     self.switch_controller(2)                     # Switch from move_it controller to servo 
                 elif abs(yaw - -math.pi/2) < self.error:
                     self.switch_controller(1)
-                    self.timer.cancel
+                    self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
+                    self.box_side = "right"
                     self.timer.reset()
                     self.switch_controller(2)   # Switch from move_it controller to servo 
 
@@ -313,7 +319,7 @@ class ServoNode(Node):
 
                     twist_msg = TwistStamped()
 
-                    if abs(yaw - math.pi/2) < self.error: #This is for the left box
+                    if self.box_side == "left": #This is for the left box
                         print("You are working with the left box")
                         twist_msg.header.stamp = self.get_clock().now().to_msg()
                         twist_msg.twist.linear.z = diff[0] * scaling_factor
@@ -323,7 +329,7 @@ class ServoNode(Node):
                         print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
                         self.twist_pub.publish(twist_msg)
                         
-                    elif abs(yaw - -math.pi/2) < self.error: #This is for the right box
+                    elif self.box_side == "right" : #This is for the right box
                         print("You are working with the right box")
                         twist_msg.header.stamp = self.get_clock().now().to_msg()
 
