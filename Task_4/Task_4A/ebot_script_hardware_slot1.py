@@ -11,7 +11,7 @@ from std_msgs.msg import Float32MultiArray,Float32
 from ebot_docking.srv import DockSw
 from tf_transformations import euler_from_quaternion
 from scipy.spatial.transform import Rotation as R
-# from usb_relay.srv import Relaysw
+from usb_relay.srv import RelaySw
 import math
 import yaml
 import os
@@ -37,14 +37,15 @@ class NavigationAndDockingNode(Node):
         self.navigator = BasicNavigator()
         self.robot_pose = [0.0, 0.0, 0.0]
         self.docking_attempts = 0
-        self.ultra_right = 0.0
-        self.ultra_left = 0.0 
-        self.yaw = 0.0 
+        self.ultra_right = None
+        self.ultra_left = None
+        self.yaw = None
+        self.rear_distance = 0.0
         self.rack_place_operation_complete = False
         self.docked = False                 # Flag to determine if docking is completed or not 
         self.target_angle_rack_3  = 0.00
         self.target_angle_rack_1 = -3.14
-        self.dock_service_error = 0.1    # Increase this factor in the 2nd Slot !!!!!!!!!!!
+        self.dock_service_error = 0.2    # Increase this factor in the 2nd Slot !!!!!!!!!!!
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
@@ -57,7 +58,7 @@ class NavigationAndDockingNode(Node):
 
     def docking_error_control_loop(self):
 
-        dock_error =  self.normalize_angle(self.target_angle_rack_3 - self.robot_pose[2])
+        dock_error =  self.target_angle_rack_3 - self.yaw
 
         if abs(dock_error) < self.dock_service_error :
             self.docked = True 
@@ -76,6 +77,10 @@ class NavigationAndDockingNode(Node):
 
         self.ultra_left= msg.data[4]
         self.ultra_right = msg.data[5]
+
+        self.rear_distance = min(self.ultra_left, self.ultra_right)
+        self.rear_distance = self.rear_distance/100
+
 
     def odometry_callback_(self,msg): 
 
@@ -121,16 +126,19 @@ class NavigationAndDockingNode(Node):
         else:
             self.get_logger().error('Navigation to the home pose failed.')
 
-    def navigate_to_arm_pose(self):   
-        pose_euler = [0,0,self.arm_orientation]
+    def navigate_to_arm_pose(self):  
+        X = 1.05      # Update this values according to the given values !!!!!!!!!!!!!
+        Y = 2.04
+        Yaw = 0.0
+        pose_euler = [0,0,Yaw]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.85    # Co-ordinates of the arm pose 
-        goal_pose.pose.position.y = -2.3 
+        goal_pose.pose.position.x = X  # Co-ordinates of the arm pose 
+        goal_pose.pose.position.y = Y
 
         goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
         goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
@@ -197,11 +205,11 @@ class NavigationAndDockingNode(Node):
 
         if future.result() is not None:
             self.get_logger().info("Docking service succeeded. Waiting for robot to come to rest.")
-            while not ( self.ultra_left < 0.15 and self.ultra_right < 0.15):
+            while not self.rear_distance < 0.25:
                 rclpy.spin_once(self)
 
             self.get_logger().info("Robot is near the rack . Triggering attachment service.")
-            # self.attach_usb_relay("ON")        Call the attach usb function after docking !!!!!!!!!!!!!!!!!!!!!!!
+            self.switch_eletromagent(True)        
         else:
             self.get_logger().error("Docking service failed.")
 
@@ -212,7 +220,7 @@ class NavigationAndDockingNode(Node):
         dock_control_request.linear_dock = True# Enable linear correction
         dock_control_request.orientation_dock = False # Enable angular correction
         dock_control_request.distance = 0.0 # Specify the desired distance
-        dock_control_request.orientation = self.target_angle  # Specify the desired orientation
+        dock_control_request.orientation = 3.14  # Specify the desired orientation
         dock_control_request.rack_no = "rack3"  # Specify the rack number
 
         future = self.docking_service_client.call_async(dock_control_request)
@@ -223,41 +231,28 @@ class NavigationAndDockingNode(Node):
             while not self.docked:
                 rclpy.spin_once(self)
                 self.get_logger().info('Second docking is not complete. Keep waiting.')
-            self.attach_usb_relay("OFF")
+            self.switch_eletromagent(False)
         else:
             self.get_logger().error("Docking service failed.")
-
-    def attach_usb_relay(self,magnet_condition):                                  # Copy the attach function from the template code !!!!!!!!!!    
-
-        if magnet_condition == "ON":
-            relay_channel = 0
-            relay_state = True
-            nav_function_call = self.navigate_to_arm_pose()
-        
-        elif magnet_condition == "OFF":
-            relay_channel = 0
-            relay_state = False 
-            nav_function_call = self.navigate_to_home_pose()
-
-        self.magnet_attach_cli = self.create_client(Relaysw, '/usb_relay_sw')
-
-        while not self.magnet_attach_cli(timeout_sec=1.0):
-            self.get_logger().info('Magnet attacher service not available, waiting again...')
-            
-        req = Relaysw.Request()
-        req.relaychannel = relay_channel
-        req.relaystate  = relay_state
     
-        future = self.magnet_attach_cli.call_async(req)
-        rclpy.spin_until_future_complete(self,future)
 
-        if future.result() is not None:
-            self.get_logger().info("Magnet attach service succeeded. Waiting for robot to come to rest.")
-            nav_function_call
+    def switch_eletromagent(self,relayState):
+        
+        self.get_logger().info('Changing state of the relay to '+str(relayState))
+        self.trigger_usb_relay = self.create_client(RelaySw, 'usb_relay_sw')
+        while not self.trigger_usb_relay.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn('USB Trigger Service not available, waiting...')
+
+        request_relay = RelaySw.Request()
+        request_relay.relaychannel = True
+        request_relay.relaystate = relayState
+        self.usb_relay_service_resp=self.trigger_usb_relay.call_async(request_relay)
+        rclpy.spin_until_future_complete(self, self.usb_relay_service_resp)
+        if(self.usb_relay_service_resp.result().success== True):
+            self.get_logger().info(self.usb_relay_service_resp.result().message)
         else:
-            self.get_logger().error("Magnet service failed.")
+            self.get_logger().warn(self.usb_relay_service_resp.result().message)
 
-        return magnet_condition
 
 
 def main(args=None):     

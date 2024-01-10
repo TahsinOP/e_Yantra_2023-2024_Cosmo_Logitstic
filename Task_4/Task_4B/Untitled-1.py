@@ -14,7 +14,7 @@ from tf2_ros import LookupException, ConnectivityException, ExtrapolationExcepti
 # from ur_msgs.srv import SetIO
 from std_srvs.srv import Trigger 
 from controller_manager_msgs.srv import SwitchController
-from linkattacher_msgs.srv import AttachLink, DetachLink
+# from linkattacher_msgs.srv import AttachLink, DetachLink
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
@@ -157,8 +157,12 @@ class ServoNode(Node):
         self.obj_no = obj_no
         self.ids = [obj_no]
 
-        self.distance_threshold = 0.01
-        self.error = 0.05   # Yaw error for side boxes 
+        self.distance_threshold_front = 0.11
+        self.distance_threshold_right = 0.12
+
+        self.box_side = "front"
+        
+        self.error = 0.2
         self.current_target_index = 0
         self.box_done = False
 
@@ -177,10 +181,11 @@ class ServoNode(Node):
 
         self.twist_pub = self.create_publisher(TwistStamped, "/servo_node/delta_twist_cmds", 10)
         self.__contolMSwitch = self.create_client(SwitchController, "/controller_manager/switch_controller")
+
         self.switch_controller(2)
         self.start_servo_service()
 
-        self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
+        self.timer = self.create_timer(0.01, self.servo_to_target,callback_group)
         
     def start_servo_service(self):
 
@@ -259,28 +264,35 @@ class ServoNode(Node):
                 target_rot_euler = list(R.from_quat(target_rotation).as_euler('xyz'))
                 current_orientation_euler = list(R.from_quat(current_orientation).as_euler('xyz'))
 
-                yaw = target_rot_euler[2] - current_orientation_euler[2]     
+                yaw = target_rot_euler[2] - current_orientation_euler[2]  
+
+                self.distance_threshold = self.distance_threshold_front  
 
                 while yaw < -math.pi:
                     yaw += 2*math.pi
 
                 #To position accordingly for left and right side boxes
                 if abs(yaw - math.pi/2) < self.error:
+                    self.switch_controller(1)
                     self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
+                    self.box_side = "left"
                     self.timer.reset()
                     self.switch_controller(2)                     # Switch from move_it controller to servo 
                 elif abs(yaw - -math.pi/2) < self.error:
-                    self.timer.cancel
-                    self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
-                    self.timer.reset()
-                    self.switch_controller(2)    # Switch from move_it controller to servo 
-                else :
                     self.switch_controller(1)
-                    
+                    self.timer.cancel()
+                    self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
+                    self.box_side = "right"
+                    self.distance_threshold = self.distance_threshold_right
+                    self.timer.reset()
+                    self.switch_controller(2)   # Switch from move_it controller to servo 
+
                 diff = [target_pose[i] - current_translation[i] for i in range(3)]
 
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
+
+                print(f"the distance is {distance}")
 
                 if distance < self.distance_threshold:
                     if (self.current_target_index%3) == 2 :
@@ -288,8 +300,8 @@ class ServoNode(Node):
                         self.switch_controller(1)         # Switch from servo to move_it controller in hardware
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.move_it_controller.move_to_a_joint_config(self.drop_pose)
-                        self.detach_link_service()                  
-                        # self.gripper_call(False)
+                        # self.detach_link_service()                  
+                        self.gripper_call(False)
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.box_done = True                    
 
@@ -297,25 +309,80 @@ class ServoNode(Node):
                     #     self.box_done = True
 
                     elif self.current_target_index == 1:
-                        # self.gripper_call(True)
-                        self.attach_link_service()
+                        self.gripper_call(True)
+                        # self.attach_link_service()
 
                     self.current_target_index += 1
 
                     if (self.box_done):
 
+                        self.move_it_controller.destroy_node()
                         self.timer.cancel() 
 
                 else:
-                    scaling_factor = 0.7
-                    twist_msg = TwistStamped()
-                    twist_msg.header.stamp = self.get_clock().now().to_msg()
-                    twist_msg.twist.linear.x = diff[0] * scaling_factor
-                    twist_msg.twist.linear.y = diff[1] * scaling_factor
-                    twist_msg.twist.linear.z = diff[2] * scaling_factor
+                    scaling_factor = 0.5
+                    scaling_factor_x = 0.75
+                    scaling_factor_y = 0.20
+                    scaling_factor_z = 0.65
 
-                    print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
-                    self.twist_pub.publish(twist_msg)
+                    twist_msg = TwistStamped()
+
+                    if self.box_side == "left": #This is for the left box
+                        print("You are working with the left box")
+                        twist_msg.header.stamp = self.get_clock().now().to_msg()
+                        twist_msg.twist.linear.z = diff[0] * scaling_factor
+                        twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        twist_msg.twist.linear.x = diff[2] * scaling_factor
+
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.y = diff[1] * scaling_factor
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        
+    
+                        print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
+                        self.twist_pub.publish(twist_msg)
+                        
+                    elif self.box_side == "right" : #This is for the right box
+                        print("You are working with the right box")
+                        twist_msg.header.stamp = self.get_clock().now().to_msg()
+
+                        twist_msg.twist.linear.z = diff[0] * scaling_factor_z
+                        twist_msg.twist.linear.y = -diff[1] * scaling_factor_y
+                        twist_msg.twist.linear.x = -diff[2] * scaling_factor_x
+
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.y = diff[1] * scaling_factor
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+    
+                        print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
+                        self.twist_pub.publish(twist_msg)
+                    else: #This is normal for the front box
+                        print("You are working with the front box")
+                        twist_msg.header.stamp = self.get_clock().now().to_msg()
+                        twist_msg.twist.linear.z = diff[0] * scaling_factor
+                        twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        twist_msg.twist.linear.x = diff[2] * scaling_factor
+
+
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.y = diff[1] * scaling_factor
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        
+                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.y = -diff[1] * scaling_factor
+                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        
+    
+                        print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
+                        self.twist_pub.publish(twist_msg)
 
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
@@ -357,51 +424,6 @@ class ServoNode(Node):
         self.__contolMSwitch.call_async(switchParam)
         print("[CM]: Switching Complete")
     
-    def attach_link_service(self):
-
-        attach_link_client = self.create_client(AttachLink, '/GripperMagnetON')
-
-        while not attach_link_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('AttachLink service not available, waiting...')
-
-        req = AttachLink.Request()
-        req.model1_name = f"box{self.obj_no}"  # Specify the box name
-        req.link1_name = 'link'
-        req.model2_name = 'ur5'
-        req.link2_name = 'wrist_3_link'
-
-        # Call the AttachLink service
-        future = attach_link_client.call_async(req)
-
-        if future.result() is not None:
-            if future.result().success:
-                self.get_logger().info("Attachment successful.")
-            else:
-                self.get_logger().error("Attachment failed: %s", future.result().message)
-
-    def detach_link_service(self):
-
-        detach_link_client = self.create_client(DetachLink, '/GripperMagnetOFF')
-
-        while not  detach_link_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('detachLink service not available, waiting...')
-
-        req = DetachLink.Request()
-        req.model1_name = f"box{self.obj_no}"  # Specify the box name
-        req.link1_name = 'link'
-        req.model2_name = 'ur5'
-        req.link2_name = 'wrist_3_link'
-
-        # Call the AttachLink service
-        future = detach_link_client.call_async(req)    
-
-        if future.result() is not None:
-            if future.result().success:
-                self.get_logger().info("detachment successful.")
-                self.detached = True
-            else:
-                self.get_logger().error("detachment failed: %s", future.result().message)
-
 
 class MoveMultipleJointPositions(Node):
 
@@ -444,8 +466,8 @@ def main(args=None):
 
     print(obj_numbers)
 
-
-    
+    obj_numbers = [1,1,49]
+    #Keep only the right box in the loop for the task!!!!!
 
     for obj_no in obj_numbers:
 
@@ -489,7 +511,7 @@ def main(args=None):
 
             rclpy.spin_once(servo_node,timeout_sec=0.02)
         
-        servo_node.move_it_controller.destroy_node()
+        # servo_node.move_it_controller.destroy_node()
 
         servo_node.get_logger().info("Shutting down Servo Node")
 

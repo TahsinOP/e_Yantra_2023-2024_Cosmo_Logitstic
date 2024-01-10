@@ -177,6 +177,7 @@ class ServoNode(Node):
         if self.current_target_index < len(self.target_poses):
             try:
                 trans = self.tf_buffer.lookup_transform(ur5.base_link_name(), ur5.end_effector_name(), Time().to_msg())
+                print(f"name is {ur5.end_effector_name}")
 
                 target_pose = self.target_poses[self.current_target_index]
                 target_rotation = self.target_rotations[self.current_target_index]

@@ -93,7 +93,7 @@ class MyRobotDockingController(Node):
         
         Controller_gain = 0.2     # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
         error = 0.2  
-      
+
         angular_speed = 0.0
         linear_speed = 0.0 
 
@@ -105,7 +105,7 @@ class MyRobotDockingController(Node):
 
             angular_error = target_angle - self.yaw
             print(f"angular error is {angular_error}") 
-              # Check the code also by removing the normalize angle function !!!!!!!!!!!!!!
+            # Check the code also by removing the normalize angle function !!!!!!!!!!!!!!
 
             angular_speed = Controller_gain * angular_error  
             velocity_msg = Twist()

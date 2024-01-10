@@ -105,7 +105,7 @@ class MyRobotDockingController(Node):
             self.velocity_pub.publish(velocity_msg)
             
                 # Check if the robot is aligned within a threshold
-            if abs(angular_error) < 0.05:
+            if abs(angular_error) < 0.03:
                 self.dock_aligned = True
                 self.get_logger().info("Robot is aligned for docking.")
             else:
@@ -136,11 +136,11 @@ class MyRobotDockingController(Node):
         rear_distance = min(self.usrleft_value, self.usrright_value)
 
         if rear_distance > 1.0:
-            linear_speed = 0.2  # Move forward when rear distance is safe
+            linear_speed = 0.4 # Move forward when rear distance is safe
         elif rear_distance < 0.15:
             linear_speed = 0.0  # Stop when getting closer to the rack
         else:
-            linear_speed = -0.2  # Move back if too close to an obstacle
+            linear_speed = -0.4  # Move back if too close to an obstacle
 
         return linear_speed
 
