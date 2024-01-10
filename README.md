@@ -65,8 +65,6 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
    ```bash
    ros2 run ebot_control ebot_docking_service
    
- 
-
 3. Task 4B : 2nd slot completed ( Marks : 20/35)
     
    Status : Picked and placed front box succefully , need to take care of the side box
