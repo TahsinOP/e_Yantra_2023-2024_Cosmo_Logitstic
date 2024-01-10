@@ -55,7 +55,16 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
    Status : Navigation and docking completed ( Need to attach and undock)
    Issues resolved : Docking error and ultrasonic sensor unit callibiration
 
-   Commands to be executed in the terminal during the slot :
+   Commands to be executed in the terminal during the slot before running the scripts : 
+   ```bash
+   ros2 run ebot_contol duplicate_imu
+   ```
+   ```bash
+   ros2 run ebot_control ebot_dock
+   ```
+   ```bash
+   ros2 run ebot_control ebot_docking_service
+   
  
 
 3. Task 4B : 2nd slot completed ( Marks : 20/35)
