@@ -43,7 +43,7 @@ class NavigationAndDockingNode(Node):
         self.rear_distance = 0.0
         self.rack_place_operation_complete = False
         self.docked = False                 # Flag to determine if docking is completed or not 
-        self.target_angle_rack_3  = 0.00
+        self.target_angle_rack_hardware = 3.14
         self.target_angle_rack_1 = -3.14
         self.dock_service_error = 0.2    # Increase this factor in the 2nd Slot !!!!!!!!!!!
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
@@ -63,15 +63,7 @@ class NavigationAndDockingNode(Node):
         if abs(dock_error) < self.dock_service_error :
             self.docked = True 
         
-        return self.docked
-
-    def normalize_angle(self, angle):
-
-        while angle > math.pi:
-            angle -= 2 * math.pi
-        while angle < -math.pi:
-            angle += 2 * math.pi
-        return angle  
+        return self.docked  
     
     def ultra_callback(self,msg):
 
@@ -80,18 +72,6 @@ class NavigationAndDockingNode(Node):
 
         self.rear_distance = min(self.ultra_left, self.ultra_right)
         self.rear_distance = self.rear_distance/100
-
-
-    def odometry_callback_(self,msg): 
-
-        self.robot_pose[0] = msg.pose.pose.position.x
-        self.robot_pose[1] = msg.pose.pose.position.y
-
-        quaternion_array = msg.pose.pose.orientation
-        orientation_list = [quaternion_array.x, quaternion_array.y, quaternion_array.z, quaternion_array.w]
-        _, _, yaw = euler_from_quaternion(orientation_list)
-        
-        self.robot_pose[2] = yaw 
     
     def orientation_callback(self,msg):     # Complete the callback function and replace the robot_pose by yaw !!!!!!!!!!!
 
@@ -153,8 +133,6 @@ class NavigationAndDockingNode(Node):
 
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation to the new pose succeeded.')
-            
-
             self.trigger_docking_service_final()
         else:
             self.get_logger().error('Navigation to the new pose failed.')       
@@ -231,6 +209,7 @@ class NavigationAndDockingNode(Node):
             while not self.docked:
                 rclpy.spin_once(self)
                 self.get_logger().info('Second docking is not complete. Keep waiting.')
+
             self.switch_eletromagent(False)
         else:
             self.get_logger().error("Docking service failed.")
@@ -250,10 +229,11 @@ class NavigationAndDockingNode(Node):
         rclpy.spin_until_future_complete(self, self.usb_relay_service_resp)
         if(self.usb_relay_service_resp.result().success== True):
             self.get_logger().info(self.usb_relay_service_resp.result().message)
+
+            if relayState == True:
+                self.navigate_to_arm_pose()
         else:
             self.get_logger().warn(self.usb_relay_service_resp.result().message)
-
-
 
 def main(args=None):     
 
