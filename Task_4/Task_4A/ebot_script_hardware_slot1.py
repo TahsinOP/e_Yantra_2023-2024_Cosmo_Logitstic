@@ -12,6 +12,7 @@ from ebot_docking.srv import DockSw
 from tf_transformations import euler_from_quaternion
 from scipy.spatial.transform import Rotation as R
 from usb_relay.srv import RelaySw
+from std_srvs.srv import Trigger
 import math
 import yaml
 import os
@@ -30,6 +31,33 @@ import os
 #			        Publishing Topics  - 
 #                   Subscribing Topics - [ odom,/ultrasonic_rl/scan,/ultrasonic_rr/scan]
 
+#commands to RUN :
+'''
+ros2 run ebot_contol duplicate_imu
+ros2 run ebot_control ebot_dock
+ros2 run ebot_control ebot_docking_service
+magnet on
+
+ros2 service call /usb_relay_sw usb_relay/srv/RelaySw "{relaychannel: 1, relaystate: true}"
+
+magnet off
+
+ros2 service call /usb_relay_sw usb_relay/srv/RelaySw "{relaychannel: 1, relaystate: false}"
+
+arduino reset 
+
+ros2 service call /usb_relay_sw usb_relay/srv/RelaySw "{relaychannel: 0, relaystate: true}"
+
+# Provide delay for 1 second
+
+ros2 service call /usb_relay_sw usb_relay/srv/RelaySw "{relaychannel: 0, relaystate: false}"
+
+ultrasonic reading 
+
+ros2 topic echo /ultrasonic_sensor_std_float
+
+
+'''
 class NavigationAndDockingNode(Node):
     def __init__(self):
         super().__init__('navigation_and_docking_node')
@@ -39,7 +67,8 @@ class NavigationAndDockingNode(Node):
         self.docking_attempts = 0
         self.ultra_right = None
         self.ultra_left = None
-        self.yaw = None
+        self.yaw = 0.0
+        self.attached = False
         self.rear_distance = 0.0
         self.rack_place_operation_complete = False
         self.docked = False                 # Flag to determine if docking is completed or not 
@@ -49,18 +78,48 @@ class NavigationAndDockingNode(Node):
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
-        self.odom_sub_for_trigger = self.create_subscription(Odometry, 'odom', self.odometry_callback_, 10)
         self.ultra_sub = self.create_subscription(Float32MultiArray, 'ultrasonic_sensor_std_float', self.ultra_callback, 10)
         self.orientation_sub = self.create_subscription(Float32,'orientation',self.orientation_callback,10)
-
+        
+        self.reset_imu()
+        self.reset_odom()
 
         self.error_timer = self.create_timer(0.2,self.docking_error_control_loop)
+
+    def reset_imu(self):
+        self.get_logger().info('Resetting IMU. Please wait...')
+        self.reset_imu_ebot = self.create_client(Trigger, 'reset_imu')
+        while not self.reset_imu_ebot.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn('/reset_imu service not available. Waiting for /reset_imu to become available.')
+
+        request_imu_reset = Trigger.Request()
+        self.imu_service_resp=self.reset_imu_ebot.call_async(request_imu_reset)
+        rclpy.spin_until_future_complete(self, self.imu_service_resp)
+        if(self.imu_service_resp.result().success== True):
+            self.get_logger().info(self.imu_service_resp.result().message)
+        else:
+            self.get_logger().warn(self.imu_service_resp.result().message)
+
+    def reset_odom(self):
+        self.get_logger().info('Resetting Odometry. Please wait...')
+        self.reset_odom_ebot = self.create_client(Trigger, 'reset_odom')
+        while not self.reset_odom_ebot.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn('/reset_odom service not available. Waiting for /reset_odom to become available.')
+
+        self.request_odom_reset = Trigger.Request()
+        self.odom_service_resp=self.reset_odom_ebot.call_async(self.request_odom_reset)
+        rclpy.spin_until_future_complete(self, self.odom_service_resp)
+        if(self.odom_service_resp.result().success== True):
+            self.get_logger().info(self.odom_service_resp.result().message)
+        else:
+            self.get_logger().warn(self.odom_service_resp.result().message)
 
     def docking_error_control_loop(self):
 
         dock_error =  self.target_angle_rack_hardware - self.yaw
 
         if abs(dock_error) < self.dock_service_error :
+
             self.docked = True 
         
         return self.docked  
@@ -72,44 +131,20 @@ class NavigationAndDockingNode(Node):
 
         self.rear_distance = min(self.ultra_left, self.ultra_right)
         self.rear_distance = self.rear_distance/100
+
+        if self.rear_distance < 0.23 :
+        
+            self.attached = True 
+
     
     def orientation_callback(self,msg):     # Complete the callback function and replace the robot_pose by yaw !!!!!!!!!!!
 
         self.yaw = msg.data
 
-    def navigate_to_home_pose(self):
-        # Define the goal pose for the subsequent navigation
-        pose_euler = [0.0,0.0,0.0]
-        euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
-        pose_quat = list(euler_rot.as_quat())
-
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.0 # Replace with your desired X coordinate
-        goal_pose.pose.position.y = 0.0 # Replace with your desired Y coordinate
-
-        goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
-        goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
-
-        # Navigate to the new goal pose
-        self.navigator.goToPose(goal_pose)
-
-        while not self.navigator.isTaskComplete():
-            pass
-
-        result = self.navigator.getResult()
-
-        if result == TaskResult.SUCCEEDED:
-            self.get_logger().info('Navigation to the home pose succeeded.')
-            self.rack_place_operation_complete = True
-        else:
-            self.get_logger().error('Navigation to the home pose failed.')
-
     def navigate_to_arm_pose(self):  
-        X = 1.05      # Update this values according to the given values !!!!!!!!!!!!!
-        Y = 2.04
-        Yaw = 0.0
+        X = 5.00     # Update this values according to the given values !!!!!!!!!!!!!
+        Y = 0.0
+        Yaw = 3.14
         pose_euler = [0,0,Yaw]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
@@ -166,6 +201,7 @@ class NavigationAndDockingNode(Node):
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation succeeded. Triggering docking service...')
             self.trigger_docking_service_intial()
+            self.switch_eletromagent(True)
         else:
             self.get_logger().error('Navigation failed.')
 
@@ -183,11 +219,11 @@ class NavigationAndDockingNode(Node):
 
         if future.result() is not None:
             self.get_logger().info("Docking service succeeded. Waiting for robot to come to rest.")
-            while not self.rear_distance < 0.25:
+            while not self.attached:
                 rclpy.spin_once(self)
 
-            self.get_logger().info("Robot is near the rack . Triggering attachment service.")
-            self.switch_eletromagent(True)        
+            self.get_logger().info("Robot is near the rack and attached ")
+            self.navigate_to_arm_pose()
         else:
             self.get_logger().error("Docking service failed.")
 
@@ -230,8 +266,6 @@ class NavigationAndDockingNode(Node):
         if(self.usb_relay_service_resp.result().success== True):
             self.get_logger().info(self.usb_relay_service_resp.result().message)
 
-            if relayState == True:
-                self.navigate_to_arm_pose()
         else:
             self.get_logger().warn(self.usb_relay_service_resp.result().message)
 

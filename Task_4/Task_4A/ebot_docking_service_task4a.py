@@ -55,6 +55,7 @@ class MyRobotDockingController(Node):
         self.dock_pose = [0.0,0.0]
         self.ultra_left = 0.0
         self.ultra_right = 0.0
+        self.yaw = 0.0
         self.dock_aligned = False
 
         # Initialize a timer for the main control loop
@@ -91,8 +92,8 @@ class MyRobotDockingController(Node):
     # Main control loop for managing docking behavior
     def controller_loop(self):
 
-        Controller_gain = 0.2     # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
-        error = 0.1 
+        Controller_gain = 0.15   # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
+        error = 0.02
 
         angular_speed = 0.0
         linear_speed = 0.0 
@@ -145,12 +146,15 @@ class MyRobotDockingController(Node):
         rear_distance = rear_distance/100
         print(f"distance is {rear_distance}")
 
-        if rear_distance > 1.0:
-            linear_speed = -0.2  # Move forward when rear distance is safe
-        elif rear_distance < 0.25:
+        if rear_distance > 0.8:
+            print(f'close to rack {rear_distance}')
+            linear_speed = -0.08  # Move forward when rear distance is safe
+        elif rear_distance < 0.23:
+            print(f'stopping{rear_distance}')
             linear_speed = 0.0  # Stop when getting closer to the rack
         else:
-            linear_speed = -0.2  # Move back if too close to an obstacle
+            linear_speed = -0.2
+            print(f'distance is wrong {rear_distance}') # Move back if too close to an obstacle
 
         return linear_speed
 
