@@ -45,7 +45,7 @@ class NavigationAndDockingNode(Node):
         self.docked = False                 # Flag to determine if docking is completed or not 
         self.target_angle_rack_hardware = 3.14
         self.target_angle_rack_1 = -3.14
-        self.dock_service_error = 0.2    # Increase this factor in the 2nd Slot !!!!!!!!!!!
+        self.dock_service_error = 0.1   # Increase this factor in the 2nd Slot !!!!!!!!!!!
         self.pre_dock_correction_factors_rack1 = [-0.57,-0.86,0.26]
         self.pre_dock_correction_factors_rack3 = [-0.57,0.23,0.69]
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
@@ -58,7 +58,7 @@ class NavigationAndDockingNode(Node):
 
     def docking_error_control_loop(self):
 
-        dock_error =  self.target_angle_rack_3 - self.yaw
+        dock_error =  self.target_angle_rack_hardware - self.yaw
 
         if abs(dock_error) < self.dock_service_error :
             self.docked = True 
@@ -195,8 +195,8 @@ class NavigationAndDockingNode(Node):
 
         self.get_logger().info("Triggering the docking service ")
         dock_control_request = DockSw.Request()
-        dock_control_request.linear_dock = True# Enable linear correction
-        dock_control_request.orientation_dock = False # Enable angular correction
+        dock_control_request.linear_dock = False# Enable linear correction
+        dock_control_request.orientation_dock = True # Enable angular correction
         dock_control_request.distance = 0.0 # Specify the desired distance
         dock_control_request.orientation = 3.14  # Specify the desired orientation
         dock_control_request.rack_no = "rack3"  # Specify the rack number

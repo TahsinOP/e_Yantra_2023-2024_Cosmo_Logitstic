@@ -90,14 +90,13 @@ class MyRobotDockingController(Node):
 
     # Main control loop for managing docking behavior
     def controller_loop(self):
-        
+
         Controller_gain = 0.2     # Change this values accordingly in the 2nd slot !!!!!!!!!!!!!!!!!
-        error = 0.2  
+        error = 0.1 
 
         angular_speed = 0.0
         linear_speed = 0.0 
 
-        
         if self.is_docking :
 
             # Calculate angular correction to align the robot with the desired orientation
