@@ -135,8 +135,8 @@ class MyRobotDockingController(Node):
         # Use ultrasonic sensor data to find the rear distance and adjust linear_speed
         rear_distance = min(self.usrleft_value, self.usrright_value)
 
-        if rear_distance > 1.0:
-            linear_speed = 0.4 # Move forward when rear distance is safe
+        if rear_distance > 0.5:
+            linear_speed = -0.4 # Move forward when rear distance is safe
         elif rear_distance < 0.15:
             linear_speed = 0.0  # Stop when getting closer to the rack
         else:

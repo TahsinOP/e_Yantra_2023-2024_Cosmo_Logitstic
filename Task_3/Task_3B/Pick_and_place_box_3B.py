@@ -13,6 +13,7 @@ from tf2_ros import LookupException, ConnectivityException, ExtrapolationExcepti
 from linkattacher_msgs.srv import AttachLink, DetachLink
 
 from std_srvs.srv import Trigger 
+from ebot_docking.srv import ArmBotSw
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
@@ -30,6 +31,75 @@ import math
 from threading import Thread
 import yaml
 import os
+
+
+
+class RackDetachmentHandler(Node):
+    def __init__(self):
+        super().__init__('rack_detachment_handler')
+
+        self.callback_group = ReentrantCallbackGroup()
+
+        self.rack_arm_service = self.create_service(ArmBotSw , 'rack_place' , self.rack_place_callback,callback_group= self.callback_group)
+
+        self.boxes_placed = 0
+
+    def rack_place_callback(self,request,response):
+
+        obj_no = request.rack_id
+
+        tf_listener_node = TFListener(obj_no)
+
+        while not tf_listener_node.first_transform_received:
+
+            rclpy.spin_once(tf_listener_node, timeout_sec=1.0)
+        
+        tf_listener_node.get_logger().info("Tf Listener Node has received the transforms")
+
+        obj_name = f"obj_{obj_no}"
+
+        post_pick = list(tf_listener_node.get_transform(obj_name))
+
+        rot = list(tf_listener_node.get_rotation(obj_name))
+        target_rot_euler = list(R.from_quat(rot).as_euler('xyz'))
+
+        
+        yaw = target_rot_euler[2]
+
+        #We have to bring the yaw in range
+        while yaw < -math.pi:
+            yaw += 2*math.pi
+
+        error = 0.05
+
+        #We have to account for the different orientations of the boxes
+        if abs(yaw - math.pi/2) < error:
+            post_pick[0] -= 0.187
+        elif abs(yaw - 0) < error:
+            post_pick[1] += 0.187
+        elif abs(yaw - math.pi) < error:
+            post_pick[1] -= 0.187   #Right hand side while facing the racks
+            
+
+        target_poses = [tf_listener_node.get_transform(obj_name),tf_listener_node.get_transform(obj_name)] #First the arm will attach to the box, and bring it back
+        target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(2)]
+
+        servo_node = ServoNode(target_poses,target_rotations,obj_no)
+
+        while not servo_node.box_done :
+
+            rclpy.spin_once(servo_node,timeout_sec=0.02)
+
+        servo_node.get_logger().info("Shutting down Servo Node")
+        
+        servo_node.destroy_node() 
+
+        self.boxes_placed = self.boxes_placed + 1
+
+        response.success = True  # Set to actual success status
+
+        return response
+
 
 class TFListener(Node):
     def __init__(self,obj_no):
@@ -90,7 +160,7 @@ class TFListener(Node):
 
 class ServoNode(Node):
     def __init__(self, target_poses, target_rotations, obj_no):
-        super().__init__('servo_node')
+        super().__init__(f'servo_node{obj_no}')
 
         self.target_poses = target_poses
         self.target_rotations = target_rotations
@@ -106,9 +176,10 @@ class ServoNode(Node):
         cons = (math.pi)/180
         self.yaw_right_box_pose = [joint_angle*cons for joint_angle in [-90, -137 , 138 , -180 , -90 , 180 ]] 
         self.yaw_left_box_pose = [joint_angle*cons for joint_angle in [90, -137 , 138 , -180 , -90 , 180 ]] 
+        self.drop_pose = [-0.027, -1.803, -1.3658, -3.039, -1.52, 3.15]
         self.home_pose = [joint_angle*cons for joint_angle in [0.0, -137 , 138 , -180 , -90 , 180 ]] 
 
-        self.move_it_controller = MoveMultipleJointPositions()                                 
+        self.move_it_controller = MoveMultipleJointPositions(obj_no)                                 
         self.tf_buffer = Buffer(Duration(seconds=10.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -119,7 +190,7 @@ class ServoNode(Node):
         self.start_servo_service()
 
         self.timer = self.create_timer(0.02, self.servo_to_target,callback_group)
-        
+
     def start_servo_service(self):
 
         # Create a client for the start_servo service
@@ -203,9 +274,13 @@ class ServoNode(Node):
 
                 #To position accordingly for left and right side boxes
                 if abs(yaw - math.pi/2) < self.error:
+                    self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
+                    self.timer.reset()
                 elif abs(yaw - -math.pi/2) < self.error:
+                    self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
+                    self.timer.reset()
 
 
                 diff = [target_pose[i] - current_translation[i] for i in range(3)]
@@ -217,7 +292,9 @@ class ServoNode(Node):
                     
                     if (self.current_target_index%2) == 1 :
                         #To move to post pick position
-                        self.move_it_controller.move_to_home_and_drop_pose_after_servoing()                   
+                        # self.move_it_controller.move_to_home_and_drop_pose_after_servoing()          
+                        self.move_it_controller.move_to_a_joint_config(self.home_pose)
+                        self.move_it_controller.move_to_a_joint_config(self.drop_pose)         
                         self.detach_link_service()
                         self.move_it_controller.move_to_a_joint_config(self.home_pose)
                         self.box_done = True
@@ -285,8 +362,8 @@ class ServoNode(Node):
 
 class MoveMultipleJointPositions(Node):
 
-    def __init__(self):
-        super().__init__('move_multiple_joint_positions')
+    def __init__(self,obj_no):
+        super().__init__(f'move_multiple_joint_positions{obj_no}')
         self.moveit2 = None
         self.detached = False
         self.movit_done = False
@@ -347,66 +424,73 @@ class MoveMultipleJointPositions(Node):
 
 def main(args=None):
     
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    yaml_file_path = os.path.join(script_dir, 'config.yaml')
+    # yaml_file_path = os.path.join(script_dir, 'config.yaml')
 
-    with open(yaml_file_path, 'r') as file:
-        config_params = yaml.safe_load(file)
+    # with open(yaml_file_path, 'r') as file:
+    #     config_params = yaml.safe_load(file)
 
     rclpy.init(args=args)
 
-    for obj_no in [int(package_id) for package_id in config_params['package_id']]:
-        tf_listener_node = TFListener(obj_no)
+    rack_detachment_handler_node = RackDetachmentHandler()
 
-        while not tf_listener_node.first_transform_received:
-
-            rclpy.spin_once(tf_listener_node, timeout_sec=1.0)
-        
-        tf_listener_node.get_logger().info("Tf Listener Node has received the transforms")
-
-        obj_name = f"obj_{obj_no}"
-
-        post_pick = list(tf_listener_node.get_transform(obj_name))
-
-        rot = list(tf_listener_node.get_rotation(obj_name))
-        target_rot_euler = list(R.from_quat(rot).as_euler('xyz'))
-
-        
-        yaw = target_rot_euler[2]
-
-        #We have to bring the yaw in range
-        while yaw < -math.pi:
-            yaw += 2*math.pi
-
-        error = 0.05
-
-        #We have to account for the different orientations of the boxes
-        if abs(yaw - math.pi/2) < error:
-            post_pick[0] -= 0.187
-        elif abs(yaw - 0) < error:
-            post_pick[1] += 0.187
-        elif abs(yaw - math.pi) < error:
-            post_pick[1] -= 0.187   #Right hand side while facing the racks
-            
-
-        target_poses = [tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
-        target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(2)]
-
-        servo_node = ServoNode(target_poses,target_rotations,obj_no)
-
-        while not servo_node.box_done :
-
-            rclpy.spin_once(servo_node,timeout_sec=0.02)
-
-        servo_node.get_logger().info("Shutting down Servo Node")
-        
-        servo_node.destroy_node() 
-
-    print('Pick and place operation completed')
-
+    while rack_detachment_handler_node.boxes_placed < 3:
+        rclpy.spin_once(rack_detachment_handler_node,timeout_sec= 0.01)
 
     rclpy.shutdown()
+
+    # for obj_no in [int(package_id) for package_id in config_params['package_id']]:
+    #     tf_listener_node = TFListener(obj_no)
+
+    #     while not tf_listener_node.first_transform_received:
+
+    #         rclpy.spin_once(tf_listener_node, timeout_sec=1.0)
+        
+    #     tf_listener_node.get_logger().info("Tf Listener Node has received the transforms")
+
+    #     obj_name = f"obj_{obj_no}"
+
+    #     post_pick = list(tf_listener_node.get_transform(obj_name))
+
+    #     rot = list(tf_listener_node.get_rotation(obj_name))
+    #     target_rot_euler = list(R.from_quat(rot).as_euler('xyz'))
+
+        
+    #     yaw = target_rot_euler[2]
+
+    #     #We have to bring the yaw in range
+    #     while yaw < -math.pi:
+    #         yaw += 2*math.pi
+
+    #     error = 0.05
+
+    #     #We have to account for the different orientations of the boxes
+    #     if abs(yaw - math.pi/2) < error:
+    #         post_pick[0] -= 0.187
+    #     elif abs(yaw - 0) < error:
+    #         post_pick[1] += 0.187
+    #     elif abs(yaw - math.pi) < error:
+    #         post_pick[1] -= 0.187   #Right hand side while facing the racks
+            
+
+    #     target_poses = [tf_listener_node.get_transform(obj_name),post_pick] #First the arm will attach to the box, and bring it back
+    #     target_rotations = [tf_listener_node.get_rotation(obj_name) for _ in range(2)]
+
+    #     servo_node = ServoNode(target_poses,target_rotations,obj_no)
+
+    #     while not servo_node.box_done :
+
+    #         rclpy.spin_once(servo_node,timeout_sec=0.02)
+
+    #     servo_node.get_logger().info("Shutting down Servo Node")
+        
+    #     servo_node.destroy_node() 
+
+    # print('Pick and place operation completed')
+
+
+    # rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

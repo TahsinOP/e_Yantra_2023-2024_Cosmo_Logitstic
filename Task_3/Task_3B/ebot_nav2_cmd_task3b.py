@@ -56,6 +56,8 @@ class NavigationAndDockingNode(Node):
 
         self.error_timer = self.create_timer(0.2,self.docking_error_control_loop)
 
+        
+
         # Retrieving package id and its poses from the config.yaml file 
 
         self.config_params = config_params
@@ -67,6 +69,8 @@ class NavigationAndDockingNode(Node):
 
         self.get_logger().info(f"The package id is {self.package_id}")
         self.get_logger().info(f"The required rack information is {self.rack_info}")
+
+        self.trigger_docking_service_intial()
 
     def docking_error_control_loop(self):
 
@@ -92,9 +96,11 @@ class NavigationAndDockingNode(Node):
         return angle  
 
     def left_sensor_callback(self, msg):
+
         self.left_sensor_distance = msg.range
 
     def right_sensor_callback(self, msg):
+
         self.right_sensor_distance = msg.range
 
     def odometry_callback_(self,msg): 
@@ -219,7 +225,7 @@ class NavigationAndDockingNode(Node):
         dock_control_request.linear_dock = True  # Enable linear correction
         dock_control_request.orientation_dock = True  # Enable angular correction
         dock_control_request.distance = 0.0 # Specify the desired distance
-        dock_control_request.orientation = (self.rack_orientation)  # Specify the desired orientation
+        dock_control_request.orientation = 3.14  # Specify the desired orientation
         dock_control_request.rack_no = f"rack{int(self.package_id)}"  # Specify the rack number
 
         future = self.docking_service_client.call_async(dock_control_request)
@@ -304,8 +310,6 @@ def main(args=None):
     rclpy.init(args=args)
 
     ebot_nav2_cmd_node = NavigationAndDockingNode(config_params)
-    
-    ebot_nav2_cmd_node.navigate_and_dock()
     
     while not ebot_nav2_cmd_node.rack_place_operation_complete:
 

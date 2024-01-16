@@ -11,7 +11,7 @@
 from scipy.spatial.transform import Rotation as R
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException, TransformException, Buffer, TransformListener
 
-# from ur_msgs.srv import SetIO
+from ur_msgs.srv import SetIO
 from std_srvs.srv import Trigger 
 from controller_manager_msgs.srv import SwitchController
 # from linkattacher_msgs.srv import AttachLink, DetachLink
@@ -77,8 +77,8 @@ class TFTopicListener(Node):
 
             final_order = [] #[1868_obj_1,1868_obj_3]
             final_order.extend(front)
-            final_order.extend(left)
             final_order.extend(right)
+            final_order.extend(left)
             
             print(final_order)
             
@@ -158,7 +158,7 @@ class ServoNode(Node):
         self.ids = [obj_no]
 
         self.distance_threshold_front = 0.11
-        self.distance_threshold_right = 0.12
+        self.distance_threshold_right = 0.13
 
         self.box_side = "front"
         
@@ -259,8 +259,8 @@ class ServoNode(Node):
                     trans.transform.translation.y,
                     trans.transform.translation.z
                 ]
-                print(f"The current_translation is {current_translation}")
-                print(f"The curent rotation is {current_orientation}")
+                print(f"The current translation for {self.obj_no} is {current_translation}")
+                print(f"The current rotation for {self.obj_no} is {current_orientation}")
                 target_rot_euler = list(R.from_quat(target_rotation).as_euler('xyz'))
                 current_orientation_euler = list(R.from_quat(current_orientation).as_euler('xyz'))
 
@@ -273,6 +273,7 @@ class ServoNode(Node):
 
                 #To position accordingly for left and right side boxes
                 if abs(yaw - math.pi/2) < self.error:
+                    print("Handling for the left side box")
                     self.switch_controller(1)
                     self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_left_box_pose)
@@ -280,6 +281,7 @@ class ServoNode(Node):
                     self.timer.reset()
                     self.switch_controller(2)                     # Switch from move_it controller to servo 
                 elif abs(yaw - -math.pi/2) < self.error:
+                    print("Handling for the right side box")
                     self.switch_controller(1)
                     self.timer.cancel()
                     self.move_it_controller.move_to_a_joint_config(self.yaw_right_box_pose)
@@ -292,7 +294,8 @@ class ServoNode(Node):
 
                 distance = (sum([diff[i] ** 2 for i in range(3)])) ** 0.5
 
-                print(f"the distance is {distance}")
+                print(f"The distance to target from tool0 is {distance}")
+                print(f"The diff vector is {diff}")
 
                 if distance < self.distance_threshold:
                     if (self.current_target_index%3) == 2 :
@@ -321,9 +324,9 @@ class ServoNode(Node):
 
                 else:
                     scaling_factor = 0.5
-                    scaling_factor_x = 0.75
-                    scaling_factor_y = 0.20
-                    scaling_factor_z = 0.65
+                    # scaling_factor_x = 0.75
+                    # scaling_factor_y = 0.20
+                    # scaling_factor_z = 0.65
 
                     twist_msg = TwistStamped()
 
@@ -338,7 +341,7 @@ class ServoNode(Node):
                         # twist_msg.twist.linear.y = diff[1] * scaling_factor
                         # twist_msg.twist.linear.z = diff[2] * scaling_factor
                         
-                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # twist_msg.twist.linear.x = -diff[0] * scaling_factor
                         # twist_msg.twist.linear.y = -diff[1] * scaling_factor
                         # twist_msg.twist.linear.z = diff[2] * scaling_factor
                         
@@ -350,39 +353,94 @@ class ServoNode(Node):
                         print("You are working with the right box")
                         twist_msg.header.stamp = self.get_clock().now().to_msg()
 
-                        twist_msg.twist.linear.z = diff[0] * scaling_factor_z
-                        twist_msg.twist.linear.y = -diff[1] * scaling_factor_y
-                        twist_msg.twist.linear.x = -diff[2] * scaling_factor_x
+                        '''
+                        Key points to keep in mind:
+                        - The mapping for x and y is their negative itself
+                        - The scaling factor for y is very less
+                        - The scaling factor for x and z is similar
+                        - In case x doesn't reach with a ~0.7 scaling factor, will try to increase it to more than 1 or 1
+                        - We can keep the scaling factor of z slightly lower than x because the difference in the z coordinates initially is large
+                        - Diff values : y >> z >> x
 
-                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
-                        # twist_msg.twist.linear.y = diff[1] * scaling_factor
-                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
+                        - If you believe that servomapping changes when you rotate 90 degrees,(WHICH IT DOESN'T), it is like z = -x and x = z, for that mapping
+
+                        '''
                         
-                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
-                        # twist_msg.twist.linear.y = -diff[1] * scaling_factor
-                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
-    
+
+                        # CONFIG-1
+                        twist_msg.twist.linear.x = diff[0] * -0.75
+                        twist_msg.twist.linear.y = diff[1] * -0.23
+                        twist_msg.twist.linear.z = diff[2] * 0.65
+
+                        # # CONFIG-2 - If negative x is not the correct x mapping
+                        # twist_msg.twist.linear.x = diff[0] * 0.75
+                        # twist_msg.twist.linear.y = diff[1] * -0.23
+                        # twist_msg.twist.linear.z = diff[2] * 0.65
+
+                        # # CONFIG-3 - If negative x is not working and x is overshooting
+                        # twist_msg.twist.linear.x = diff[0] * 0.7
+                        # twist_msg.twist.linear.y = diff[1] * -0.23
+                        # twist_msg.twist.linear.z = diff[2] * 0.7
+
+                        # # CONFIG-4 - This is the old mapping, with x and z interchanged
+                        # twist_msg.twist.linear.x = diff[2] * 0.75
+                        # twist_msg.twist.linear.y = diff[1] * -0.23
+                        # twist_msg.twist.linear.z = diff[0] * 0.65
+
+                        # # CONFIG-5 - If old mapping with x and z interchanged and the x is negative (DON'T USE)
+                        # twist_msg.twist.linear.x = diff[2] * -0.75
+                        # twist_msg.twist.linear.y = diff[1] * -0.23
+                        # twist_msg.twist.linear.z = diff[0] * 0.65
+
+                        # # CONFIG-6 - If negative x is giving the correct mapping, and you want x to overshoot
+                        # twist_msg.twist.linear.x = diff[0] * 1.2
+                        # twist_msg.twist.linear.y = diff[1] * -0.23
+                        # twist_msg.twist.linear.z = diff[2] * 0.65
+
+                        # # CONFIG-7 - If negative x is not the correct x mapping, and you want x to be at 1
+                        # twist_msg.twist.linear.x = diff[0] * 1
+                        # twist_msg.twist.linear.y = diff[1] * -0.23
+                        # twist_msg.twist.linear.z = diff[2] * 0.65
+
+                        # # CONFIG-8 - If you want to use constant step-size on the x 
+                        # use_constant_step_size = True
+                        # CONSTANT_STEP_SIZE = 0.005
+                        # scaling_factor_x = 1.0
+                        # scaling_factor_y = 0.23
+                        # scaling_factor_z = 0.65
+                        # scaled_difference_x = diff[0]*scaling_factor_x
+                        # twist_msg.twist.linear.x = max(scaled_difference_x,CONSTANT_STEP_SIZE) if use_constant_step_size else scaled_difference_x
+                        # # twist_msg.twist.linear.y = -diff[1]*scaling_factor_y
+                        # # twist_msg.twist.linear.z = diff[2]*scaling_factor_z
+
                         print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
                         self.twist_pub.publish(twist_msg)
+
+
                     else: #This is normal for the front box
                         print("You are working with the front box")
                         twist_msg.header.stamp = self.get_clock().now().to_msg()
+
+                        # CONFIG-1 - This the is OG configuration that works
+                        scaling_factor = 0.5
                         twist_msg.twist.linear.z = diff[0] * scaling_factor
                         twist_msg.twist.linear.y = -diff[1] * scaling_factor
                         twist_msg.twist.linear.x = diff[2] * scaling_factor
 
 
-                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
-                        # twist_msg.twist.linear.y = diff[1] * scaling_factor
-                        # twist_msg.twist.linear.z = diff[2] * scaling_factor
-                        
-                        # twist_msg.twist.linear.x = diff[0] * scaling_factor
+                        # CONFIG-2 - This is with the new mapping
+                        # twist_msg.twist.linear.x = -diff[0] * scaling_factor           # newww mapping found
                         # twist_msg.twist.linear.y = -diff[1] * scaling_factor
                         # twist_msg.twist.linear.z = diff[2] * scaling_factor
-                        
+
+                        # CONFIG-3 - This is with the new mapping with different scaling factor for the three axes
+                        # twist_msg.twist.linear.x = -diff[0] * 0.65           # newww mapping found
+                        # twist_msg.twist.linear.y = -diff[1] * 0.23
+                        # twist_msg.twist.linear.z = diff[2] * 0.65                        
     
                         print(twist_msg.twist.linear.x,twist_msg.twist.linear.y,twist_msg.twist.linear.z)
                         self.twist_pub.publish(twist_msg)
+
 
             except (LookupException,ConnectivityException,ExtrapolationException):
                 self.get_logger().error("Failed to lookup transform from base_link to ee_link.")
@@ -466,8 +524,7 @@ def main(args=None):
 
     print(obj_numbers)
 
-    obj_numbers = [1,1,49]
-    #Keep only the right box in the loop for the task!!!!!
+    obj_numbers = [2,15] #2 is for the right box and 15 is for the front box, when you want to fully run the script keep [15,2]
 
     for obj_no in obj_numbers:
 

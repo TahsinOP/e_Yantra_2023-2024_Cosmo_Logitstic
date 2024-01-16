@@ -10,12 +10,14 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Range 
 from ebot_docking.srv import DockSw
+from ebot_docking.srv import ArmBotSw
 from tf_transformations import euler_from_quaternion
 from scipy.spatial.transform import Rotation as R
 from linkattacher_msgs.srv import AttachLink, DetachLink  
 import math
 import yaml
 import os
+import threading
 
 # Team ID:          CL#1868
 
@@ -32,12 +34,11 @@ import os
 #                   Subscribing Topics - [ odom,/ultrasonic_rl/scan,/ultrasonic_rr/scan]
 
 class NavigationAndDockingNode(Node):
-        
-    
 
     def __init__(self, config_params, rack_idx ,navigator_service):
 
         super().__init__(f'navigation_and_docking_node{rack_idx}')
+        self.package_id = 3
         self.navigator = navigator_service
         self.robot_pose = [0.0, 0.0, 0.0]
         self.docking_attempts = 0
@@ -55,6 +56,7 @@ class NavigationAndDockingNode(Node):
         self.arm_pose_correction_factors_rack3 = []
         self.arm_pose_correction_factors_rack2 = []
         self.docking_service_client = self.create_client(DockSw, 'dock_control') 
+        self.rack_arm_client = self.create_client(ArmBotSw , 'rack_place')
         self.link_attach_client = self.create_client(AttachLink, '/ATTACH_LINK')
         self.link_detach_client = self.create_client(DetachLink, '/DETACH_LINK')
         self.odom_sub_for_trigger = self.create_subscription(Odometry, 'odom', self.odometry_callback_, 10)
@@ -77,6 +79,22 @@ class NavigationAndDockingNode(Node):
 
         self.get_logger().info(f"The package id is {self.package_id}")
         self.get_logger().info(f"The required rack information is {self.rack_info}")
+    
+    def send_place_rack_request(self,package_id=None):
+        # Send a service request to the navigation node
+        request = ArmBotSw.Request()
+        request.rack_id = self.package_id
+
+        if package_id is not None:
+            request.rack_id = package_id
+
+        future = self.rack_arm_client.call_async(request)
+
+        if future.result() is not None:
+            self.get_logger().info("Arm Rack service suceeded ")
+        else:
+            self.get_logger().error("Service call failed!")
+
 
     def docking_error_control_loop(self):
 
@@ -122,6 +140,8 @@ class NavigationAndDockingNode(Node):
         _, _, yaw = euler_from_quaternion(orientation_list)
         
         self.robot_pose[2] = yaw 
+
+        # print(f"yaw is {yaw}")
 
     def navigate_to_home_pose(self):
         # Define the goal pose for the subsequent navigation
@@ -187,20 +207,18 @@ class NavigationAndDockingNode(Node):
     def navigate_to_arm_pose(self): 
 
         if self.package_id == 1 :         # Condition to check the packages ids and allot its respective post-docking angles 
-            self.arm_orientation = 1.9
-            self.arm_pose_x = 1.239
-            self.arm_pose_y = -3.33
+            self.arm_orientation = 1.8
+            self.arm_pose_x = 1.38
+            self.arm_pose_y = -3.34
 
             
             # self.arm_pose_x = 1.258
             # self.arm_pose_y = -3.3
 
         elif self.package_id == 2:
-            self.arm_orientation = 0.7
+            self.arm_orientation = 0.3
             self.arm_pose_x = 0.75
-            self.arm_pose_y = -2.45
-
-
+            self.arm_pose_y = -2.4
 
         pose_euler = [0,0,self.arm_orientation]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
@@ -243,6 +261,13 @@ class NavigationAndDockingNode(Node):
             self.corrected_rack_orientation = self.rack_orientation + self.pre_dock_correction_factors_rack1[0]     # Correction factors for pre-dock poses
             self.corrected_rack_pose_x = self.rack_pose_x+self.pre_dock_correction_factors_rack1[1]
             self.corrected_rack_pose_y = self.rack_pose_y+self.pre_dock_correction_factors_rack1[2]
+        
+        elif self.package_id == 3 :
+
+            self.corrected_rack_orientation = 0.0
+            self.corrected_rack_pose_x = 0.0
+            self.corrected_rack_pose_y = 0.0
+
 
 
         pose_euler = [0,0,self.corrected_rack_orientation]
@@ -267,8 +292,13 @@ class NavigationAndDockingNode(Node):
         result = self.navigator.getResult()
 
         if result == TaskResult.SUCCEEDED:
-            self.get_logger().info('Navigation succeeded. Triggering docking service...')
-            self.trigger_docking_service_intial()
+
+            if self.package_id == 3 :
+                self.rack_place_operation_complete = True
+                self.send_place_rack_request()
+            else :
+                self.get_logger().info('Navigation succeeded. Triggering docking service...')
+                self.trigger_docking_service_intial()
         else:
             self.get_logger().error('Navigation failed.')
 
@@ -353,6 +383,7 @@ class NavigationAndDockingNode(Node):
             self.get_logger().info("detachment service succeeded.")
             self.get_logger().info("Navigating to home after successful detachment...")
             self.rack_place_operation_complete = True  # Call the new navigation method
+            self.send_place_rack_request()
         else:
             self.get_logger().error("Attachment service failed.")
 
@@ -366,9 +397,11 @@ def main(args=None):
 
     rclpy.init(args=args)
 
+    first_time_arm_called = False
+
     navigator_service = BasicNavigator()
 
-    for rack_idx in range(2):
+    for rack_idx in range(3):
 
         ebot_nav2_cmd_node = NavigationAndDockingNode(config_params,rack_idx,navigator_service)
 

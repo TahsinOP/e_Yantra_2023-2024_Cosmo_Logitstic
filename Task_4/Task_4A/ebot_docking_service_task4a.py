@@ -33,7 +33,7 @@ class MyRobotDockingController(Node):
 
         # Create a callback group for managing callbacks
         self.callback_group = ReentrantCallbackGroup()
-        self.yaw = None
+        self.yaw = 0.0
 
         # Subscribe to odometry data for robot pose information
         self.odom_sub = self.create_subscription(Odometry, 'odom', self.odometry_callback, 10)
@@ -98,7 +98,7 @@ class MyRobotDockingController(Node):
         angular_speed = 0.0
         linear_speed = 0.0 
 
-        if self.is_docking :
+        if self.orientation_dock :
 
             # Calculate angular correction to align the robot with the desired orientation
             target_angle = self.dock_pose[1] 
@@ -120,24 +120,24 @@ class MyRobotDockingController(Node):
             else:
                 self.get_logger().info("Aligning robot...")
 
-            if self.dock_aligned and self.linear_dock :
+        if  self.linear_dock :
                 
-                linear_speed = self.calculate_linear_correction()
+            linear_speed = self.calculate_linear_correction()
 
-                if linear_speed == 0.0:
+            if linear_speed == 0.0:
 
-                # If no linear correction is needed, stop the robot
-                    velocity_msg = Twist()
-                    velocity_msg.linear.x = 0.0
-                    self.velocity_pub.publish(velocity_msg)
-                    self.is_docking = False  # Docking is complete
-                    self.get_logger().info("Docking complete.")
-                else:
-                # Publish the calculated linear speed
-                    velocity_msg = Twist()
-                    velocity_msg.linear.x = linear_speed
-                    self.velocity_pub.publish(velocity_msg)
-                    self.get_logger().info(f"Linear correction: {linear_speed}")
+            # If no linear correction is needed, stop the robot
+                velocity_msg = Twist()
+                velocity_msg.linear.x = 0.0
+                self.velocity_pub.publish(velocity_msg)
+                self.is_docking = False  # Docking is complete
+                self.get_logger().info("Docking complete.")
+            else:
+            # Publish the calculated linear speed
+                velocity_msg = Twist()
+                velocity_msg.linear.x = linear_speed
+                self.velocity_pub.publish(velocity_msg)
+                self.get_logger().info(f"Linear correction: {linear_speed}")
 
     def calculate_linear_correction(self):
         # Implement linear correction based on ultrasonic sensor data
@@ -153,7 +153,7 @@ class MyRobotDockingController(Node):
             print(f'stopping{rear_distance}')
             linear_speed = 0.0  # Stop when getting closer to the rack
         else:
-            linear_speed = -0.2
+            linear_speed = -0.08
             print(f'distance is wrong {rear_distance}') # Move back if too close to an obstacle
 
         return linear_speed
@@ -161,7 +161,7 @@ class MyRobotDockingController(Node):
     # Callback function for the DockControl service
     def dock_control_callback(self, request, response):
 
-        self.is_docking = True  # Start docking process
+        # self.is_docking = True  # Start docking process
         self.dock_aligned = False  # Reset alignment flag
         self.linear_dock = request.linear_dock  # Set linear correction flag
         self.orientation_dock = request.orientation_dock  # Set angular correction flag

@@ -85,6 +85,8 @@ class NavigationAndDockingNode(Node):
         self.reset_odom()
 
         self.error_timer = self.create_timer(0.2,self.docking_error_control_loop)
+        # self.trigger_docking_service_intial()
+        # self.trigger_docking_service_final()      For testing docking directly from pre-dock pose 
 
     def reset_imu(self):
         self.get_logger().info('Resetting IMU. Please wait...')
@@ -200,8 +202,9 @@ class NavigationAndDockingNode(Node):
 
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation succeeded. Triggering docking service...')
-            self.trigger_docking_service_intial()
             self.switch_eletromagent(True)
+            self.trigger_docking_service_intial()
+
         else:
             self.get_logger().error('Navigation failed.')
 
@@ -209,9 +212,9 @@ class NavigationAndDockingNode(Node):
         self.get_logger().info("Triggering the docking service ")
         dock_control_request = DockSw.Request()
         dock_control_request.linear_dock = True  # Enable linear correction
-        dock_control_request.orientation_dock = True  # Enable angular correction
+        dock_control_request.orientation_dock = False  # Enable angular correction
         dock_control_request.distance = 0.0 # Specify the desired distance
-        dock_control_request.orientation = 0.0  # Specify the desired orientation
+        dock_control_request.orientation = 0.0  # Specify the desired orientation give this a bit error because there is deviation in IMU
         dock_control_request.rack_no = "rack3"  # Specify the rack number
 
         future = self.docking_service_client.call_async(dock_control_request)
