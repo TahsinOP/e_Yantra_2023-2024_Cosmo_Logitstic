@@ -70,7 +70,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
    Status : Picked and placed front box succefully , need to take care of the side box
    Issues reloved : Changed the mapping of axis in hardware ("tool0" link ),Tuned the scaling factor and distance threshold to reach the front box 
 
-4. Task 4C :
+4. Task 4C : Completed ( Marks : 29.31/30 )
 
 https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/aa9b9b31-4ead-4218-9104-c058acd71ea4
 
