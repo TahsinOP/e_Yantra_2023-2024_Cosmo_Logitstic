@@ -57,7 +57,7 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 
    Commands to be executed in the terminal during the slot before running the scripts : 
    ```bash
-   ros2 run ebot_contol duplicate_imu
+   ros2 run ebot_control duplicate_imu
    ```
    ```bash
    ros2 run ebot_control ebot_dock
