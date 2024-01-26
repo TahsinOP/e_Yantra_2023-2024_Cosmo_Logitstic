@@ -83,6 +83,10 @@ ii . The above logic worked well in simualation performed very poorly in hardwar
 Solution : Should have used the unit vector logic suggested in 2A ( Find the unit vector using diff_vector / distance and scale it accordingly ) . This will handle the velocities of the end-effector more dynamically 
 
 #### Task 4A
+i. The code logic for this task was completely fine , it navigated to the pre-dock pose , did docking ( with a bit offset ) but couldnt attach .
+ii . The major issue was the bot was not going close enough to the rack , and the bot was not alligned properly with the rack . 
+
+Solution : Could have done the task if we had one more slot . Wasted half of 3rd slot due to connection issues 
 
 
 
