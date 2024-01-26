@@ -50,16 +50,6 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/a50750c0-593b-4c77-90c6-3d2d47225154
 
 ## Task 4 : ( Deadline : 19th January )  -----  Finished at Rank # 16 - 59.31/100 
-### Reasons due to which we couldn't complete hardware tasks 
-#### Task4A : 
-
-#### Task4B : 
-i .The main issue was with servoing ( not axis mapping ) we were directly using the difference calculated and scaling it to the twist messages 
-
-ii . The above logic worked well in simualation performed very poorly in hardware 
-
-Solution : Should have used the unit vector logic suggested in 2A ( Find the unit vector using diff_vector / distance and scale it accordingly ) . This will handle the velocities of the end-effector more dynamically 
-
 1. Task 4A : 2nd slot completed ( Marks : 10/35)
 
    Status : Navigation and docking completed ( Need to attach and undock)
@@ -83,5 +73,16 @@ Solution : Should have used the unit vector logic suggested in 2A ( Find the uni
 4. Task 4C : Completed ( Marks : 29.31/30 )
 
 https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/aa9b9b31-4ead-4218-9104-c058acd71ea4
+
+### Reasons due to which we couldn't complete hardware tasks 
+#### Task 4B 
+    i .The main issue was with servoing ( not axis mapping ) we were directly using the difference calculated and scaling it to the twist messages 
+
+    ii . The above logic worked well in simualation performed very poorly in hardware 
+
+    Solution : Should have used the unit vector logic suggested in 2A ( Find the unit vector using diff_vector / distance and scale it accordingly ) . This will handle the velocities of the end-effector more dynamically 
+
+#### Task 4A
+
 
 
