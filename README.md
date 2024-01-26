@@ -76,11 +76,11 @@ https://github.com/TahsinOP/e_Yantra_2023-2024_Cosmo_Logitstic/assets/117567813/
 
 ### Reasons due to which we couldn't complete hardware tasks 
 #### Task 4B 
-    i .The main issue was with servoing ( not axis mapping ) we were directly using the difference calculated and scaling it to the twist messages 
+i .The main issue was with servoing ( not axis mapping ) we were directly using the difference calculated and scaling it to the twist messages 
 
-    ii . The above logic worked well in simualation performed very poorly in hardware 
+ii . The above logic worked well in simualation performed very poorly in hardware 
 
-    Solution : Should have used the unit vector logic suggested in 2A ( Find the unit vector using diff_vector / distance and scale it accordingly ) . This will handle the velocities of the end-effector more dynamically 
+Solution : Should have used the unit vector logic suggested in 2A ( Find the unit vector using diff_vector / distance and scale it accordingly ) . This will handle the velocities of the end-effector more dynamically 
 
 #### Task 4A
 
