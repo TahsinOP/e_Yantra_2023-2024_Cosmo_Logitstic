@@ -98,14 +98,14 @@ class MyRobotDockingController(Node):
             # Calculate angular correction to align the robot with the desired orientation
             target_angle = self.dock_pose[1] 
             angular_error = self.normalize_angle(target_angle - self.robot_pose[2])
-            angular_speed = 0.8 * angular_error  # P-controller for angular correction
+            angular_speed = 1.35 * angular_error  # P-controller for angular correction
             velocity_msg = Twist()
             velocity_msg.angular.z = angular_speed
 
             self.velocity_pub.publish(velocity_msg)
             
                 # Check if the robot is aligned within a threshold
-            if abs(angular_error) < 0.03:
+            if abs(angular_error) < 0.07:
                 self.dock_aligned = True
                 self.get_logger().info("Robot is aligned for docking.")
             else:

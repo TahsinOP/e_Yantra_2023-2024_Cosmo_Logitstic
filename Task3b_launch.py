@@ -14,9 +14,9 @@ def generate_launch_description():
     package_dir = get_package_share_directory('ur_description')  # Replace with your package name
 
     # Paths to the scripts and config file within the package directory
-    script1_path = os.path.join(package_dir, 'scripts', 'ebot_nav2_cmd_task3b.py')
-    script2_path = os.path.join(package_dir, 'scripts', 'ebot_docking_service_task3b.py')
-    script3_path = os.path.join(package_dir,'scripts', 'aruco_detection_3B.py')
+    script2_path = os.path.join(package_dir, 'scripts', 'ebot_nav2_cmd_task4b.py')
+    script3_path = os.path.join(package_dir, 'scripts', 'ebot_docking_service_task4b.py')
+    script1_path = os.path.join(package_dir,'scripts', 'aruco_detection_3B.py')
     script4_path = os.path.join(package_dir,'scripts', 'Pick_and_place_box_3B.py')
     # Example path to a config file in a 'config' directory
 
@@ -47,7 +47,8 @@ def generate_launch_description():
 
 
     return LaunchDescription([
-        navigation_command,
-        docking_command,
-        script1_exit_handler
+    aruco_detection_command,
+    navigation_command,
+    Box_pick_and_place_command,
+    docking_command
     ])

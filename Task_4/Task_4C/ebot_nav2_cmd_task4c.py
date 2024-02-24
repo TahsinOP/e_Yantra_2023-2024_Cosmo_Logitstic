@@ -4,6 +4,7 @@
 from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import rclpy
+import time
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
@@ -38,7 +39,6 @@ class NavigationAndDockingNode(Node):
     def __init__(self, config_params, rack_idx ,navigator_service):
 
         super().__init__(f'navigation_and_docking_node{rack_idx}')
-        self.package_id = 3
         self.navigator = navigator_service
         self.robot_pose = [0.0, 0.0, 0.0]
         self.docking_attempts = 0
@@ -46,12 +46,12 @@ class NavigationAndDockingNode(Node):
         self.docked = False 
         self.docked_midway = False                # Flag to determine if docking is completed or not 
         self.target_angle_rack_3  = 3.14
-        self.target_angle_rack_1 = -1.57
+        self.target_angle_rack_1 = - 1.57
         self.target_angle_rack_2 = -3.14
-        self.dock_service_error = 0.03
-        self.pre_dock_correction_factors_rack1 = [-0.95,-0.86,0.15]
-        self.pre_dock_correction_factors_rack3 = [-0.57,-0.3,0.6]
-        self.pre_dock_correction_factors_rack2 = [-1.1,-0.11,-0.9]
+        self.dock_service_error = 0.07
+        self.pre_dock_correction_factors_rack1 = [-1.2,-0.86,0.15]#-1.3
+        self.pre_dock_correction_factors_rack3 = [-0.57,-0.3,0.6]#-0.57
+        self.pre_dock_correction_factors_rack2 = [-0.5,-0.11,-0.9]#-0.5 , -0.05
         self.arm_pose_correction_factors_rack1 = []
         self.arm_pose_correction_factors_rack3 = []
         self.arm_pose_correction_factors_rack2 = []
@@ -62,21 +62,14 @@ class NavigationAndDockingNode(Node):
         self.odom_sub_for_trigger = self.create_subscription(Odometry, 'odom', self.odometry_callback_, 10)
         self.left_sensor_subscription = self.create_subscription(Range,'/ultrasonic_rl/scan', self.left_sensor_callback,10)
         self.right_sensor_subscription = self.create_subscription( Range,'/ultrasonic_rr/scan', self.right_sensor_callback,10)
-
+        self.cmd_vel_sub = self.create_publisher(Twist ,'cmd_vel',10)
         self.error_timer = self.create_timer(0.2,self.docking_error_control_loop)
-        
-
-        # Retrieving package id and its poses from the config.yaml file 
-
         self.config_params = config_params
         self.package_id = self.config_params['package_id'][rack_idx]
         self.rack_info = self.config_params['position'][int(self.package_id)-1][f"rack{self.package_id}"]
         self.rack_pose_x = self.rack_info[0]
         self.rack_pose_y = self.rack_info[1]
         self.rack_orientation = self.rack_info[2]
-        
-        
-
         self.get_logger().info(f"The package id is {self.package_id}")
         self.get_logger().info(f"The required rack information is {self.rack_info}")
     
@@ -87,23 +80,18 @@ class NavigationAndDockingNode(Node):
 
         if package_id is not None:
             request.rack_id = package_id
-
         future = self.rack_arm_client.call_async(request)
-
         if future.result() is not None:
             self.get_logger().info("Arm Rack service suceeded ")
         else:
             self.get_logger().error("Service call failed!")
 
-
     def docking_error_control_loop(self):
 
         if self.package_id == 2 : 
             self.target_angle = self.target_angle_rack_2
-        
         elif self.package_id == 1 :
             self.target_angle = self.target_angle_rack_1
-
         else :
             self.target_angle = self.target_angle_rack_3
 
@@ -112,16 +100,15 @@ class NavigationAndDockingNode(Node):
         if abs(dock_error) < self.dock_service_error :
             self.docked = True 
             self.error_timer.cancel()
-        
+    
         return self.docked
-
-
     def normalize_angle(self, angle):
 
         while angle > math.pi:
             angle -= 2 * math.pi
         while angle < -math.pi:
             angle += 2 * math.pi
+
         return angle  
 
     def left_sensor_callback(self, msg):
@@ -134,14 +121,10 @@ class NavigationAndDockingNode(Node):
 
         self.robot_pose[0] = msg.pose.pose.position.x
         self.robot_pose[1] = msg.pose.pose.position.y
-
         quaternion_array = msg.pose.pose.orientation
         orientation_list = [quaternion_array.x, quaternion_array.y, quaternion_array.z, quaternion_array.w]
         _, _, yaw = euler_from_quaternion(orientation_list)
-        
         self.robot_pose[2] = yaw 
-
-        # print(f"yaw is {yaw}")
 
     def navigate_to_home_pose(self):
         # Define the goal pose for the subsequent navigation
@@ -154,18 +137,14 @@ class NavigationAndDockingNode(Node):
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         goal_pose.pose.position.x = 0.0 # Replace with your desired X coordinate
         goal_pose.pose.position.y = 0.0 # Replace with your desired Y coordinate
-
         goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
         goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
 
-        # Navigate to the new goal pose
         self.navigator.goToPose(goal_pose)
 
         while not self.navigator.isTaskComplete():
             pass
-
         result = self.navigator.getResult()
-
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation to the home pose succeeded.')
             self.rack_place_operation_complete = True
@@ -174,7 +153,7 @@ class NavigationAndDockingNode(Node):
     
     def navigate_to_mid_dock_pose(self):
         # Define the goal pose for the subsequent navigation
-        pose_euler = [0.0,0.0,-0.9]
+        pose_euler = [0.0,0.0,3.0] #2.5
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
         pose_quat = list(euler_rot.as_quat())
 # Correction factors for pre-dock poses
@@ -184,8 +163,8 @@ class NavigationAndDockingNode(Node):
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = 0.3# Replace with your desired X coordinate
-        goal_pose.pose.position.y = -3.0# Replace with your desired Y coordinate
+        goal_pose.pose.position.x = 1.47# Replace with your desired X coordinate
+        goal_pose.pose.position.y = -3.6# Replace with your desired Y coordinate
 
         goal_pose.pose.orientation.z = pose_quat[2]# Replace with your desired orientation
         goal_pose.pose.orientation.w = pose_quat[3]# Replace with your desired orientation
@@ -200,6 +179,7 @@ class NavigationAndDockingNode(Node):
 
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info('Navigation to the home pose succeeded.')
+            self.send_place_rack_request(3)
             self.trigger_docking_service_midway()
         else:
             self.get_logger().error('Navigation to the home pose failed.')
@@ -207,7 +187,7 @@ class NavigationAndDockingNode(Node):
     def navigate_to_arm_pose(self): 
 
         if self.package_id == 1 :         # Condition to check the packages ids and allot its respective post-docking angles 
-            self.arm_orientation = 1.8
+            self.arm_orientation = 1.9
             self.arm_pose_x = 1.38
             self.arm_pose_y = -3.34
 
@@ -216,9 +196,9 @@ class NavigationAndDockingNode(Node):
             # self.arm_pose_y = -3.3
 
         elif self.package_id == 2:
-            self.arm_orientation = 0.3
-            self.arm_pose_x = 0.75
-            self.arm_pose_y = -2.4
+            self.arm_orientation = 0.5
+            self.arm_pose_x = 0.57
+            self.arm_pose_y = -2.51
 
         pose_euler = [0,0,self.arm_orientation]
         euler_rot = (R.from_euler('xyz',pose_euler,degrees=False))
@@ -295,7 +275,7 @@ class NavigationAndDockingNode(Node):
 
             if self.package_id == 3 :
                 self.rack_place_operation_complete = True
-                self.send_place_rack_request()
+                # self.send_place_rack_request()
             else :
                 self.get_logger().info('Navigation succeeded. Triggering docking service...')
                 self.trigger_docking_service_intial()
@@ -324,6 +304,46 @@ class NavigationAndDockingNode(Node):
         else:
             self.get_logger().error("Docking service failed.")
 
+    def give_linear_velocity(self):
+
+        velocity_cmd = Twist()
+
+
+        if self.robot_pose[1] < -3.35:
+
+            print(self.robot_pose[1])
+            velocity_cmd.linear.x = -0.3
+
+            self.cmd_vel_sub.publish(velocity_cmd)
+
+        elif self.robot_pose[1] > -3.35:
+            velocity_cmd.linear.x = 0.0
+            self.cmd_vel_sub.publish(velocity_cmd)
+            self.trigger_detachment_service()
+
+    def trigger_docking_service_midway(self):
+        self.get_logger().info("Triggering the docking service ")
+        dock_control_request = DockSw.Request()
+        dock_control_request.linear_dock = True # Enable linear correction
+        dock_control_request.orientation_dock = True  # Enable angular correction
+        dock_control_request.distance = 0.0 # Specify the desired distance
+        dock_control_request.orientation = -1.57  # Specify the desired orientation
+        dock_control_request.rack_no = f"rack{int(self.package_id)}"  # Specify the rack number
+
+        future = self.docking_service_client.call_async(dock_control_request)
+        rclpy.spin_until_future_complete(self, future)
+
+        if future.result() is not None:
+            while not self.docked:
+                rclpy.spin_once(self)
+                self.get_logger().info('Second docking is not complete. Keep waiting.')
+            self.linear_timer = self.create_timer(0.2,self.give_linear_velocity)
+            self.give_linear_velocity()
+            self.get_logger().info("Docking service succeeded. Waiting for robot to come to rest.")
+            self.get_logger().info("Robot is near the rack . Triggering attachment service.")
+        else:
+            self.get_logger().error("Docking service failed.")
+
     def trigger_docking_service_final(self):
 
         self.get_logger().info("Triggering the docking service ")
@@ -342,7 +362,8 @@ class NavigationAndDockingNode(Node):
             while not self.docked:
                 rclpy.spin_once(self)
                 self.get_logger().info('Second docking is not complete. Keep waiting.')
-            self.trigger_detachment_service()
+            # self.send_place_rack_request()
+            self.trigger_detachment_service_new()
         else:
             self.get_logger().error("Docking service failed.")
     
@@ -363,12 +384,38 @@ class NavigationAndDockingNode(Node):
         if attachment_future.result() is not None:
             self.get_logger().info("Attachment service succeeded.")
             self.get_logger().info("Navigating to arm pose after successful attachment...")
-        
-            self.navigate_to_arm_pose()
+            if self.package_id == 1 :
+                self.navigate_to_mid_dock_pose()
+            elif self.package_id  == 2 :
+                self.send_place_rack_request(1)
+                self.navigate_to_arm_pose()
+            else : 
+                self.navigate_to_arm_pose()
         else:
             self.get_logger().error("Attachment service failed.")
 
     def trigger_detachment_service(self):
+        self.linear_timer.cancel()
+        self.get_logger().info("Triggering the detachment service")
+        detachment_request = DetachLink.Request()
+        detachment_request.model1_name = 'ebot'
+        detachment_request.link1_name = 'ebot_base_link'
+        detachment_request.model2_name = f"rack{self.package_id}"  # Replace with the actual rack name
+        detachment_request.link2_name = 'link'
+
+        detachment_future = self.link_detach_client.call_async(detachment_request)
+        # rclpy.spin_until_future_complete(self, detachment_future)
+
+        if detachment_future.result() is not None:
+            self.get_logger().info("detachment service succeeded.")
+        else:
+            self.get_logger().error("Attachment service failed.")
+            self.get_logger().info("Navigating to home after successful detachment...")
+            self.rack_place_operation_complete = True  # Call the new navigation method
+            # self.send_place_rack_request()
+
+
+    def trigger_detachment_service_new(self):
         self.get_logger().info("Triggering the detachment service")
         detachment_request = DetachLink.Request()
         detachment_request.model1_name = 'ebot'
@@ -380,12 +427,12 @@ class NavigationAndDockingNode(Node):
         rclpy.spin_until_future_complete(self, detachment_future)
 
         if detachment_future.result() is not None:
-            self.get_logger().info("detachment service succeeded.")
-            self.get_logger().info("Navigating to home after successful detachment...")
-            self.rack_place_operation_complete = True  # Call the new navigation method
             self.send_place_rack_request()
+            self.get_logger().info("detachment service succeeded.")
+            self.rack_place_operation_complete = True  # Call the new navigation method
         else:
             self.get_logger().error("Attachment service failed.")
+            self.get_logger().info("Navigating to home after successful detachment...")
 
 def main(args=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -396,8 +443,6 @@ def main(args=None):
         config_params = yaml.safe_load(file)        
 
     rclpy.init(args=args)
-
-    first_time_arm_called = False
 
     navigator_service = BasicNavigator()
 
@@ -414,8 +459,10 @@ def main(args=None):
         print("lund")
 
         ebot_nav2_cmd_node.destroy_node()
-        
-
+    
+    ebot_final_home_node = NavigationAndDockingNode(config_params,0,navigator_service)
+    ebot_final_home_node.navigate_to_home_pose()
+    ebot_final_home_node.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':
